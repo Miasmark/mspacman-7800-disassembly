@@ -722,6 +722,61 @@ that presumably increments when `sub_F6E8` fires -- it touches
 transition timing counters elsewhere, so they're likely just borrowed
 for jingle/pause timing rather than being the lives counter itself.
 
+## Cruise Elroy: a retraction, and the orphan blocks re-checked properly
+
+The user pushed back on two points from the previous round, and both
+pushbacks were right.
+
+**The "live-confirmed Cruise Elroy activation" was wrong.** A prior
+pass reported `ram_2144` (the Elroy speed code) for Blinky flipping
+`0`->`1` at frame 21,685 in `run-02.inp` as proof the mechanism
+activates in real play, and noted the observed value (1) didn't match
+this project's own hand-read of `rom:D777`'s threshold branches
+(expected 3 or 4) -- a "discrepancy left open." The user asked directly
+whether that discrepancy might trace back to Elroy's requirement that
+every ghost be out of the house first. Checking `rom:D777`'s code more
+carefully turned up exactly that gate -- it checks `GhostState` for
+slot 3 (the last-released ghost, standing in for all four) being `0`
+before it even looks at the dots-remaining thresholds -- but that gate
+turned out not to be the actual explanation. A follow-up probe cross-
+checking `GhostFrightFlag` at the same frame showed it flipping to `8`
+(frightened) on the *exact same frame* `ram_2144` flipped to `1`, and
+both flipping back together later (`GhostFrightFlag` to `16`/eaten,
+`ram_2144` to `0`). `ram_2144,X` is also written unconditionally by
+`rom:sub_DAC3` (fright start) and `rom:sub_DAF8` (per-wave speed-
+cadence wrap) -- nothing to do with Elroy at all. What got reported as
+"Elroy activating" was a power pellet being eaten, full stop -- the
+same RAM-slot-reuse trap this project has hit and documented before
+(see `a7800-toolkit/docs/pitfalls.md`). Genuine Elroy activation (value
+3 or 4) was never actually observed in this recording. Retracted in
+place in both `annotations.json` (`rom:D777`, `rom:DEF7`) and here.
+
+**The four orphan data blocks got a real second look, not a shrug.**
+The previous round's "unresolved, likely dead code" verdict for
+`dat_F83C`/`dat_E9BD`/`dat_E9D4`/`dat_D49B` rested on one check: no
+`JMP`/`JSR` instruction targets them anywhere in the *disassembled
+instruction text*. The user pointed out that's not the same as
+checking for a RAM-vector-based indirect call, and asked directly
+whether that had been checked. It hadn't -- so it was, properly, this
+time: (1) a raw byte scan of the *entire* 16KB ROM (not just the
+disassembled listing, since a hidden call could itself be sitting
+inside a currently-misclassified data block) for `JSR`/`JMP` opcodes
+with any of the four addresses as a literal operand -- **zero hits**;
+(2) a scan for every occurrence of the `JMP (indirect)` opcode (`$6C`)
+anywhere in the ROM, code or data alike, to catch a jump through a RAM
+vector -- 14 raw hits, every one checked by hand and confirmed
+coincidental (operand/data bytes that happen to equal `$6C`, e.g. the
+low byte of address `$216C` inside real `CMP`/`LDA`/`STA` instructions
+already traced, or bytes inside already-confirmed graphics/table data);
+(3) a scan for the classic 6502 "RTS trick" (push a target address
+minus one, then `RTS` into it) for all four addresses, both byte
+orders -- no hits. This is a materially stronger negative result than
+the original "grepped the listing" check, and it still comes up empty:
+there is no indirect-call mechanism of any common shape anywhere in
+this ROM. The four blocks remain flagged as unresolved rather than
+resolved-by-elimination -- a real absence of evidence, not proof there
+isn't some other mechanism this search didn't think to check for.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -753,20 +808,18 @@ for jingle/pause timing rather than being the lives counter itself.
   `dat_DF21`), and two independent ghost-house-release mechanisms --
   all live-verified against `run-02.inp`, not just statically traced.
   The Cruise Elroy speed-boost thresholds are also now found (keyed by
-  `MazeColorVariant`, see "Mode switching" above) and its mechanism
-  fully traced: the speed code (`ram_2144,X`) is a Y-index into the
-  same `ram_2150`+ block used for wall color and the mode-timer,
-  sampling one bit per tick to gate whether the ghost's movement
+  `MazeColorVariant`, see "Mode switching" above), it's gated on
+  `GhostState` for slot 3 (the last-released ghost) being fully out of
+  the house before it even checks the dots-remaining thresholds, and
+  its speed mechanism is traced: the code (`ram_2144,X`) is a Y-index
+  into the same `ram_2150`+ block used for wall color and the mode-
+  timer, sampling one bit per tick to gate whether the ghost's movement
   decision runs at all -- a duty-cycle throttle, not a distinct code
-  path (see `rom:DEF7`'s comment). Live-confirmed the code itself
-  activates in real play (`ram_2144` for Blinky flips `0`->`1` mid-wave
-  in `run-02.inp`, correlated with dots eaten), though the exact
-  resulting on-screen speed difference wasn't separately measured, and
-  the specific code value seen didn't match this pass's own hand-read
-  of the threshold branches -- a small discrepancy left open rather
-  than forced to agree. Whether ghost-house release also has a
-  dot-count-linked trigger alongside the two timer-based mechanisms
-  found remains open.
+  path (see `rom:DEF7`'s comment). **A live-verification claim here was
+  wrong and has been retracted in place** (see "Cruise Elroy: a
+  retraction" below) -- genuine activation is still unconfirmed live.
+  Whether ghost-house release also has a dot-count-linked trigger
+  alongside the two timer-based mechanisms found remains open.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **RESOLVED.** The ghost-chain table (200/400/800/1,600) and the fruit
   table were found first and live-verified. Dots (10 points) and power
