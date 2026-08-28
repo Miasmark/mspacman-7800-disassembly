@@ -827,6 +827,43 @@ all. They do, every time, just never by the game. Not pursued further:
 exactly what the BIOS's checksum is protecting or verifying, since
 that's BIOS behavior and out of scope for a cartridge disassembly.
 
+**One more question worth answering, even for code the game never
+runs: what would each block actually *do* in relation to the game, if
+it somehow executed?** None of the four turned out to be mysterious --
+each fits cleanly into a system already found elsewhere, reading like
+superseded utility code rather than a distinct, undiscovered feature:
+
+* `dat_D49B` (`JMP $D5B9`) sits in reset-adjacent code, right next to
+  another reset jump (`L_D498`). `$D5B9` is `rom:sub_D5B9`, a real,
+  already-called routine -- part of the same wave-transition chain
+  (`sub_CC73`) traced earlier -- that zeroes `ram_2110` and resets two
+  position-scratch bytes to `$B0`. Executing this would just
+  redundantly re-run a reset the game already performs through its
+  normal path.
+* `dat_E9BD` (the generic page-copy loop) copies N*256 bytes between
+  two pointers using the same scratch-pointer convention (`$B0`-`$B3`)
+  the tile-buffer and graphics-pointer routines use elsewhere -- but
+  sized far bigger than anything the shipped game's actual bulk copies
+  need (the maze bitmap load is 128 bytes, the display-list graphics
+  copy ~88 bytes, both hand-unrolled fixed loops). Reads like a
+  general-purpose copy utility superseded once the real data sizes
+  were known.
+* `dat_E9D4` (`X*4+24`) is the most concrete of the four: every per-
+  actor array in this game (`GhostState`, `GhostFrightFlag`, the Elroy
+  speed code) is 4 bytes apart, one byte per actor slot -- and `+24`
+  lands exactly on `ram_2148`, a real, heavily-referenced (13 sites)
+  per-actor array in that same block. Called with an actor slot in X,
+  it would compute "the address of actor X's `ram_2148` slot" -- a
+  reusable version of the `TXA`/`ASL A`/`ASL A` idiom the game writes
+  inline elsewhere for other offsets in this same array stack.
+* `dat_F83C` (the row-pointer lookup) reads the *same* per-row Maria
+  graphics-pointer table (`dat_F52C`/`dat_F54B`) the NMI display-list
+  builder uses, staging the result into `ram_00B0`/`ram_00B1` -- the
+  same generic pointer pair `rom:sub_F5E9`/`rom:sub_F5FF` (tile
+  read/write) and `rom:sub_F890` (sprite lookup) all consume. Called
+  with a row index in Y, it would seed that pair ready to feed straight
+  into one of those routines.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
