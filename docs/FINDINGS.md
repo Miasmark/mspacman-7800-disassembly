@@ -321,6 +321,57 @@ because by wave 9+ the named fruit sequence has already ended (see "The
 Banana lock" above) and those transitions are less memorable, not
 because the mechanism differs.
 
+## Why the Teddy Bear start "runs slowly" -- solved, and it's not a special mode
+
+The last piece of the user's original three hints. The mechanism turned
+out to connect directly to two things already found: the title-screen
+level-select cursor (`FruitTypeFloor`) and `WaveCounter`.
+
+`rom:CC01` (new game setup, right after the "ONE PLAYER" choice) copies
+`FruitTypeFloor` -- the same byte the level-select cursor writes on the
+title screen -- straight into `WaveCounter`. So choosing a starting
+level on the title screen doesn't just pick a fruit icon and a maze
+(as "The Banana lock" section above covers); **it seeds the real
+difficulty/wave counter itself.** Choosing Teddy Bear starts the game at
+`WaveCounter=0`, the very first wave of the game's normal progression --
+there's no separate "practice"/"slow" mode bit anywhere in this.
+
+`WaveCounter` was already known to drive the fruit-type and maze-change
+schedules. It turns out it also drives movement speed, through a table
+that hadn't been examined yet: `rom:sub_DAA7` clamps `WaveCounter` to a
+max index of 19 and uses it to index `dat_DCF9` (20 bytes), landing in
+`WaveSpeedPeriod` (`ram_00F3`, newly named). **`dat_DCF9[0]` -- wave 0,
+i.e. the Teddy Bear start -- is `$C0` (192), by far the largest value in
+the whole table** (next is `$B4`/180 at wave 1, then it falls into the
+`$1E`-`$96`/30-150 range from wave 4 on).
+
+`WaveSpeedPeriod` gets copied into `SpeedCountdown` (`ram_00DC`) every
+time Pac-Man's actor is (re)spawned for a wave. `rom:sub_DC44` -- the
+actual movement-cadence gate -- decrements `SpeedCountdown` once every
+other frame and only fires a real movement step when the counter's
+current value matches one of five fixed checkpoints in a pair of small
+tables (`dat_DC6B`/`dat_DC70`). Since there are always exactly five
+checkpoints no matter how big the starting period is, a period of 192
+spreads those same five steps across far more real frames than a period
+of 60 does -- directly, mechanically slower on-screen movement, not a
+different code path or a distinct mode.
+
+**Live-verified in `run-02.inp`** (the Teddy Bear-start recording): at
+frame 2144, exactly where the recorded player's real game begins (after
+an attract-mode demo round that cycles through unrelated wave values),
+`SpeedCountdown` loads to 192 and visibly counts down 1 per 2 frames.
+Later in the same recording, wave 4 loads a period of 90 (frame ~19,291)
+and wave 5 loads 60 (frame ~21,369) -- each countdown visibly faster
+than the last, confirming the period value really does behave as a
+speed dial across the whole recording, not just at wave 0. Wave 0's 192
+is the single slowest period in the entire table, which is exactly why
+starting on Teddy Bear specifically stood out to the user: it's the
+slowest tier of the game's ordinary per-wave speed curve, just reached
+directly from the title screen instead of by playing through it.
+
+This closes all three of the user's original gameplay hints, plus the
+intermission-code half of hint 2 found separately above.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -354,10 +405,12 @@ because the mechanism differs.
   bytes but hasn't been traced to its own specific call site yet.
 * Extra-life threshold, if one exists in this port.
 * ~~The Teddy Bear level-select starting point, and what specifically
-  slows the game down when starting from it~~ -- **PARTIALLY ANSWERED.**
-  The level-select screen and the Teddy Bear fruit value are confirmed
-  live (see above). What specifically makes the game run *slowly* when
-  started this way is still open -- not yet investigated.
+  slows the game down when starting from it~~ -- **RESOLVED.** The
+  title-screen level-select cursor seeds `WaveCounter` directly at game
+  start, and `WaveCounter` indexes a per-wave movement-speed-period
+  table (`dat_DCF9`) whose wave-0 entry is the single largest/slowest
+  value in the table -- see "Why the Teddy Bear start 'runs slowly'"
+  above, live-verified against `run-02.inp`.
 * ~~Where the intermission animations live, and whether they really do
   trigger after the Strawberry and Apple level wins specifically~~ --
   **RESOLVED.** `rom:sub_E0FB` sets up three special actor sprites and
