@@ -653,8 +653,13 @@ guess had mislabeled this same routine as a "fright-mode duration
 timer" before this pass traced it properly -- that guess never made it
 into `annotations.json`, so there's nothing to retract there, but it's
 worth naming as a wrong turn corrected before being written down).
-Whether this port *also* has a dot-count-linked release wasn't found
-this pass.
+**UPDATE: whether this port also has a dot-count-linked release,
+resolved -- no.** `DotsEatenCount` (`ram_00AA`) is read in exactly two
+places anywhere in this ROM: its own increment, and the Cruise Elroy
+speed check. Never anywhere near `GhostReleaseTimeout`, `dat_E8AA`, or
+the `GhostState`==4 release checks. This port's ghost-house release is
+purely the two timer-based mechanisms above; there's no dot-count-
+linked release the way the original arcade has.
 
 ## Dot and power-pellet scoring, found and live-verified
 
@@ -940,8 +945,10 @@ frame 2,200 (wave 0) shows an empty tray; a screenshot at frame 21,500
   path (see `rom:DEF7`'s comment). **A live-verification claim here was
   wrong and has been retracted in place** (see "Cruise Elroy: a
   retraction" below) -- genuine activation is still unconfirmed live.
-  Whether ghost-house release also has a dot-count-linked trigger
-  alongside the two timer-based mechanisms found remains open.
+  ~~Whether ghost-house release also has a dot-count-linked trigger~~ --
+  **RESOLVED, no.** `DotsEatenCount` is read in exactly two places in
+  this whole ROM, neither near the release code -- this port's release
+  is purely the two timer-based mechanisms already found.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **RESOLVED.** The ghost-chain table (200/400/800/1,600) and the fruit
   table were found first and live-verified. Dots (10 points) and power
