@@ -17,6 +17,14 @@
 *.trk
 *.log
 /snap/
+/title01/
+/title02/
+/title02b/
+/title03/
+/title04/
+/fruitcheck/
+/fruitcheck2/
+/fruitframe/
 
 # Raw memory dumps -- contain copyrighted ROM/RAM bytes, reproducible from
 # a recording + a probe script (see docs/FINDINGS.md for which probe made

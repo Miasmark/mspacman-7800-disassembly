@@ -153,11 +153,72 @@ the same role gameplay hints played in every sibling project so far:
   for this port -- the exact kind of manual-vs-ROM divergence the
   Galaga project ran into more than once.
 
+## First live pass: the fruit point-value table, found by grepping for `SED` and confirmed exactly against the manual
+
+Went after the user's "Teddy Bear gave 50 points" hint directly, using
+the same technique that opened up the Galaga project's own score
+mechanism: grep the static disassembly for `SED` (BCD arithmetic) rather
+than diffing RAM blindly. Only 4 sites in the whole ROM -- a short list,
+not a haystack.
+
+`rom:sub_F61A` is the score-add routine itself: it BCD-adds a staged
+4-byte value into the current player's score (`Score`, `ram_0046-0049`,
+or `Score2` for the other player). Only the low two bytes of that staged
+value (`ScoreDeltaHi`/`ScoreDeltaLo`, `ram_00BB`/`ram_00BC`) are ever set
+by any caller -- so every point award in this game funnels through just
+those two bytes before the add happens.
+
+Tracing backward from there to the actual award sites turned up two
+paired lookup tables, both indexed by a small live counter and both at
+the same x10-per-BCD-unit scale this project's Galaga sibling
+independently discovered in its own score accumulator:
+
+* **The fruit table** (`dat_E0EB`/`dat_E0F3`, indexed by
+  `CurrentFruitType`, `ram_2116`) matches the manual's fruit-scoring
+  table *exactly*, all 8 entries: Teddy Bear 50, Cherries 100,
+  Strawberry 200, Orange 500, Pretzel 700, Apple 1,000, Pear 2,000,
+  Banana 5,000.
+* **The ghost-chain table** (`dat_E0E3`/`dat_E0E7`, indexed by
+  `GhostChainCount`, `ram_00FE`) reads 200/400/800/1,600 -- the classic
+  arcade Pac-Man ghost-eating progression, not stated in this port's own
+  manual at all.
+
+**Live-verified, not just read off the table.** A PC-tagged write-tap on
+`ScoreDeltaHi`/`ScoreDeltaLo` across the Teddy Bear level in `run-02.inp`
+caught the exact award: at frame 3,011, both bytes are set to `$00`/`$05`
+(`CurrentFruitType` confirmed `0` at that instant) right as the
+on-screen score jumps from 2,160 to 2,210 -- a clean +50. A screenshot
+at that exact frame shows Ms. Pac-Man directly overlapping a distinct
+brown, round, eyeless sprite at the ghost-house exit (all four ghosts
+have the same two-eye pattern; this doesn't), consistent with the fruit
+item itself. A second award later in the same recording (frame 7,372,
+`CurrentFruitType` confirmed `1`) comes to exactly +100, matching the
+table's Cherries entry. The first three ghost-chain values were also
+caught live (frames 2,239/2,492/2,613), lining up with a "200"
+score-popup screenshotted directly during the same search.
+
+**What this doesn't settle:** what actually sets `CurrentFruitType` --
+i.e. what decides which fruit appears when -- and whether it's capped at
+7 (Banana) or can go higher. A separate byte this project had guessed
+might be "the level index" (`ram_2124`, feeding a different, much
+larger table via `rom:sub_E159`) turned out not to behave like a small
+level counter at all when checked live (values like 47, 38, 111 showed
+up, not a clean 0-7) -- that guess is retracted rather than left
+standing; what `ram_2124` and its table actually are is still open. This
+is the natural next step toward the user's third hint (whether the
+level-name sequence really clamps at Banana).
+
 ## What's still open
 
-* Whether the two small-integer-signature blocks (`dat_E342`,
-  `dat_EB75`) really are maze/level layout data -- the leading
-  candidate, not yet decoded into an actual grid.
+* ~~Whether the two small-integer-signature blocks (`dat_E342`,
+  `dat_EB75`) really are maze/level layout data~~ -- **PARTIALLY
+  ANSWERED, and probably wrong as originally framed.** `dat_E342` is
+  read via `rom:sub_E159`, indexed by `ram_2124` -- but `ram_2124` was
+  checked live and does *not* behave like a small per-level index (see
+  above), so this is more likely a different kind of table entirely
+  (possibly per-object or per-frame data, given the values seen). Not
+  maze layout in the "2D grid of wall/path tiles" sense originally
+  guessed. What it actually is remains open.
 * Whether the large graphics-signature block (`dat_C000`) really is
   character/sprite tile data -- not yet rendered or cross-checked
   against known 7800 graphics-mode bit-plane conventions.
@@ -168,17 +229,29 @@ the same role gameplay hints played in every sibling project so far:
   frightened timing, if this port implements anything beyond "turns
   blue when a pellet is eaten") -- entirely unconfirmed against the
   ROM's own bytes so far.
-* Actual point values for dots, power pellets, and ghosts -- the manual
-  gives the fruit table only.
+* ~~Actual point values for dots, power pellets, and ghosts~~ --
+  **PARTIALLY ANSWERED.** The ghost-chain table is now found and mostly
+  live-verified (200/400/800/1,600, see above). Dots and power pellets
+  themselves are still unconfirmed -- the fruit/ghost tables were found
+  first because `SED` search led straight to them; dot-eating almost
+  certainly goes through the same `ScoreDeltaHi`/`ScoreDeltaLo` staging
+  bytes but hasn't been traced to its own specific call site yet.
 * Extra-life threshold, if one exists in this port.
-* The Teddy Bear level-select starting point, and what specifically
-  slows the game down when starting from it -- the user's first hint,
-  not yet investigated.
+* ~~The Teddy Bear level-select starting point, and what specifically
+  slows the game down when starting from it~~ -- **PARTIALLY ANSWERED.**
+  The level-select screen and the Teddy Bear fruit value are confirmed
+  live (see above). What specifically makes the game run *slowly* when
+  started this way is still open -- not yet investigated.
 * Where the intermission animations live, and whether they really do
   trigger after the Strawberry and Apple level wins specifically -- the
   user's second hint, not yet investigated.
 * Whether the maze/level name sequence genuinely clamps at Banana rather
   than moving to "random fruit" as the manual describes -- the user's
-  third hint, not yet investigated.
+  third hint. Directly connected to what's now found: `CurrentFruitType`
+  (`ram_2116`) is confirmed as the live index into the fruit-value table,
+  and whether it can exceed 7 is the concrete next check.
+* What `ram_2124` and the large table it indexes (`dat_E342` onward)
+  actually are, now that "level index into maze data" is retracted as
+  the likely explanation.
 * The private reference source stays unconsulted, per the plan -- see
   `README.md`.

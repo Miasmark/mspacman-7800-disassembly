@@ -35,8 +35,19 @@
     "rom:F34D": "ENTRY_Nmi",
     "rom:CA20": "ENTRY_Reset"
   },
-  "ram": {},
-  "comments": {},
+  "ram": {
+    "46": "Score",
+    "4C": "Score2",
+    "BB": "ScoreDeltaHi",
+    "BC": "ScoreDeltaLo",
+    "2116": "CurrentFruitType",
+    "FE": "GhostChainCount"
+  },
+  "comments": {
+    "rom:F61A": "CONFIRMED LIVE, first live-verified finding for this project. The score-add routine: zeroes ram_00B9/ram_00BA, then BCD-adds a 4-byte value (ram_00B9-ram_00BC) into the current player's score -- Score (ram_0046-0049, 4 bytes/8 BCD digits) if ram_0042==0 and ram_0045==0, else Score2 (ram_004C-004F) for the other branch. Since ram_00B9/00BA are always zeroed by this routine itself before the add, only ScoreDeltaHi (ram_00BB) and ScoreDeltaLo (ram_00BC) ever carry a real value -- i.e. every caller stages the actual point award into just these two bytes (up to BCD 9999) before calling here. Found by grepping for SED (4 sites total in this ROM, the same short-candidate-list technique used throughout the sibling projects) rather than guessing.",
+    "rom:E026": "CONFIRMED LIVE and screenshot-verified -- this is the user's 'Teddy Bear gave 50 points as a fruit' hint, directly resolved. dat_E0EB (high BCD digit pair) and dat_E0F3 (low BCD digit pair), both indexed by CurrentFruitType (ram_2116), are the fruit point-value table -- and at a x10-per-unit BCD scale (the same scaling convention independently found in the Galaga project's own score accumulator), they match the manual's fruit table EXACTLY across all 8 entries: Teddy Bear 50, Cherries 100, Strawberry 200, Orange 500, Pretzel 700, Apple 1,000, Pear 2,000, Banana 5,000 (the last three needing the high-byte table's $01/$02/$05 to reach four digits, since the low byte alone caps at BCD 99). LIVE-VERIFIED against run-02.inp: at frame 3,011, ScoreDeltaHi/Lo are set to $00/$05 (CurrentFruitType=0, i.e. Teddy Bear) right as ScoreDigit/on-screen score jumps from 2160 to 2210 -- and a screenshot at that exact frame shows Ms. Pac-Man directly overlapping a distinct brown, round, non-ghost sprite (no eyes, unlike all four ghosts) at the ghost-house exit, consistent with the fruit item. A second event at frame 7,372 (CurrentFruitType=1, Cherries) awards exactly +100, matching the table's second entry. What still isn't confirmed: what actually sets CurrentFruitType (i.e. what decides which fruit appears when), and whether it's capped at 7 (Banana) or can go higher -- directly relevant to the user's third hint about the level-name sequence appearing to plateau at Banana rather than moving to 'random fruit' as the manual describes.",
+    "rom:E084": "The ghost-eating chain point-value table, structurally analogous to the fruit table at rom:E026 -- dat_E0E3 (high BCD digit pair: $00,$00,$00,$01) / dat_E0E7 (low BCD digit pair: $20,$40,$80,$60), indexed by GhostChainCount (ram_00FE, incremented once per ghost eaten within a single power-pellet frightened window). At the same x10-per-unit BCD scale as the fruit table, the four paired entries read as 200/400/800/1,600 -- the classic arcade Pac-Man ghost-chain progression exactly. LIVE-CONFIRMED for the first three (frames 2239/2492/2613 in run-02.inp, matching a '200' score-popup screenshotted directly during this investigation); the fourth (1,600) is read from the table only -- no 4th-consecutive-ghost event appeared in the recording checked so far."
+  },
   "headers": {},
   "blocks": [
     {
