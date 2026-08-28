@@ -1106,9 +1106,40 @@ own pad byte. Even the earlier `CHARBASE` puzzle fits: the game copies
 this tile set into RAM and points `CHARBASE` there, which is why the
 register never points at `$C000` directly.
 
-Still open, and much smaller now: the 192 bytes at `rom:C000`-`rom:C0BF`,
-before the `$50` tile sequence begins, are not part of the character set
-and remain uncharacterised.
+**Follow-up: the leading 192 bytes, and a correction.** Asked to check
+what references `rom:C000`-`rom:C0BF`, the region before the `$50`
+sequence. It isn't a separate mystery -- it's the same 6-byte glyph grid
+continuing *backwards*, holding tiles `$30`-`$4F`, and tile `$30` lands
+exactly on the block's first byte. Both halves are referenced:
+
+* **`$30`-`$45` are the maze wall pieces.** That is precisely the set of
+  tile codes the maze autotiler emits (`dat_FBBC`/`dat_FBDC` use
+  `$30`-`$45` plus the `$50` blank -- an exact range match), and
+  rendering them gives wall corners, edges, verticals and horizontals.
+* **`$46`-`$4F` are a second set of digits `0`-`9`,** in a different
+  palette index. They're referenced by `dat_FAA9` (`$54,$46`) and
+  `dat_FAAB` (`$46,$54`) in the score renderer `rom:sub_F6F4`, which
+  picks the digit base from `ram_0045` -- so the two players' scores are
+  drawn from two parallel, differently-coloured digit sets.
+
+**And a correction to the "RESOLVED COMPLETELY" claim above, which was
+too broad.** The glyph grid can only account for `rom:C000`-`rom:C4DF`,
+because even the maximum 8-bit tile code `$FF` maps to `rom:C4DA`. The
+remaining **1,344 bytes (`rom:C4E0`-`rom:CA1F`, 52% of the block) cannot
+be tiles at all** -- no 8-bit tile code can reach them. A phase test
+confirms the grid really stops there rather than merely running out of
+codes: across `rom:C000`-`rom:C4DF` the 6-byte cadence is unmistakable
+(42% zeros at cell position 5, the pad byte, versus 9-24% at the other
+five phases), while across the tail the same test is flat (29-37% at
+every phase). So the character set is solved and the tail is genuinely
+something else, still unidentified.
+
+A full byte-level scan also confirms there are **zero** absolute CPU
+references anywhere in the ROM into `rom:C000`-`rom:CA1F` -- one
+apparent hit was a false positive, the scanner decoding the operand
+bytes of a `JMP` as though they were an opcode -- consistent throughout
+with MARIA DMA-ing this region rather than the 6502 ever loading from
+it.
 
 ## What's still open
 
@@ -1124,7 +1155,10 @@ and remain uncharacterised.
   maze wall and title-logo tiles, at `rom:C0C0` + (tile-`$50`)x6, six
   bytes per glyph. Found by tracing the intermission's text renderer
   rather than guessing pixel formats -- see "dat_C000 fully solved"
-  above. Only the 192 bytes before `rom:C0C0` remain uncharacterised.
+  above. The leading 192 bytes resolved too (tiles `$30`-`$4F`: maze
+  wall pieces + a second digit set). **Still open, corrected scope:**
+  the 1,344-byte tail `rom:C4E0`-`rom:CA1F` is beyond any possible
+  8-bit tile code and is not character data.
   *(Superseded earlier note:)* **CONFIRMED, partially.** See
   "dat_C000, actually confirmed as graphics" above: a 242-byte run
   (`rom:C0D2`-`rom:C1C4`) is structurally proven to be genuine 2-color
