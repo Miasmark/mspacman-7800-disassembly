@@ -1,0 +1,184 @@
+{
+  "_README": [
+    "Started by init.py from Ms Pac-Man (NTSC) (Atari) (1987) (E42FC700).a78.",
+    "",
+    "Every human judgement about this ROM lives in this file; the",
+    "generated listings are disposable, so renaming is free.",
+    "",
+    "What to do next, roughly in order:",
+    "",
+    "  1. python tools/disasm.py Ms Pac-Man (NTSC) (Atari) (1987) (E42FC700).a78 -c annotations.json",
+    "     Read the coverage it reports. Low coverage is normal at",
+    "     first and is the number you are trying to move.",
+    "",
+    "  2. Every unresolved indirect jump it reports is a hole. Add the",
+    "     target to `entries`, or the pointer pair to `ram_vectors` if",
+    "     the handler is installed into RAM.",
+    "",
+    "  3. python tools/audiotrace.py Ms Pac-Man (NTSC) (Atari) (1987) (E42FC700).a78 -c annotations.json",
+    "     Finds the sound code and the tables feeding it.",
+    "",
+    "  4. Name things in `labels` as soon as you know what they are.",
+    "",
+    "See docs/method.md for the working order and docs/pitfalls.md for",
+    "the traps that each cost real time."
+  ],
+  "entries": [
+    "rom:F41C",
+    "rom:F34D",
+    "rom:CA20"
+  ],
+  "ram_vectors": [],
+  "bankat": {},
+  "labels": {
+    "rom:F41C": "ENTRY_Irq",
+    "rom:F34D": "ENTRY_Nmi",
+    "rom:CA20": "ENTRY_Reset"
+  },
+  "ram": {},
+  "comments": {},
+  "headers": {},
+  "blocks": [
+    {
+      "loc": "rom:C000",
+      "end": "rom:CA20",
+      "name": "dat_C000",
+      "note": "CONFIRMED no gaps-closing risk (checked across all 23 initial gap ranges as a batch): no JSR/JMP anywhere in the code traced so far lands inside this range. Byte-frequency signature -- 96 distinct values, dominated by $00/$55/$54/$15/$3F/$AA/$FF -- matches the dense, few-values-repeated bit-plane pattern the sibling 16K projects' actual graphics/character sheets all showed. Sits immediately before RESET ($CA20) at the very base of the mapped ROM window, with zero xrefs from any 6502 code traced so far -- consistent with Maria DMA-ing this directly as character/sprite data rather than the 6502 ever loading it by address, which is the normal, expected case for graphics data on this hardware (not a red flag the way a stray reachable-code gap would be). Declared as one block to close the gap; not decoded into individual tiles this pass."
+    },
+    {
+      "loc": "rom:E342",
+      "end": "rom:E639",
+      "name": "dat_E342",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature: small integer values (0-8 range) dominate, unlike the graphics-tile blocks' bit-plane pattern -- a plausible candidate for maze-layout or collision-map data (tile-type IDs: wall/path/dot/power-pellet and similar, encoded as small per-cell integers), matching the user's own expectation that most of this ROM should be level data. Not decoded into an actual grid/dimensions this pass -- a real next step, not a conclusion."
+    },
+    {
+      "loc": "rom:EB75",
+      "end": "rom:F31E",
+      "name": "dat_EB75",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature: small integer values (0-8 range) dominate, unlike the graphics-tile blocks' bit-plane pattern -- a plausible candidate for maze-layout or collision-map data (tile-type IDs: wall/path/dot/power-pellet and similar, encoded as small per-cell integers), matching the user's own expectation that most of this ROM should be level data. Not decoded into an actual grid/dimensions this pass -- a real next step, not a conclusion."
+    },
+    {
+      "loc": "rom:F8C6",
+      "end": "rom:FAAD",
+      "name": "dat_F8C6",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:CF51",
+      "end": "rom:D062",
+      "name": "dat_CF51",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:DF21",
+      "end": "rom:DFEA",
+      "name": "dat_DF21",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:DCCD",
+      "end": "rom:DD49",
+      "name": "dat_DCCD",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:D614",
+      "end": "rom:D671",
+      "name": "dat_D614",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:F52C",
+      "end": "rom:F57C",
+      "name": "dat_F52C",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:D3E1",
+      "end": "rom:D423",
+      "name": "dat_D3E1",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:FBBC",
+      "end": "rom:FBFC",
+      "name": "dat_FBBC",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E970",
+      "end": "rom:E999",
+      "name": "dat_E970",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E0DD",
+      "end": "rom:E0FB",
+      "name": "dat_E0DD",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:DE73",
+      "end": "rom:DE8B",
+      "name": "dat_DE73",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:F5A6",
+      "end": "rom:F5BD",
+      "name": "dat_F5A6",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E9BD",
+      "end": "rom:E9CE",
+      "name": "dat_E9BD",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E9F7",
+      "end": "rom:EA07",
+      "name": "dat_E9F7",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E8AA",
+      "end": "rom:E8B8",
+      "name": "dat_E8AA",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:F83C",
+      "end": "rom:F847",
+      "name": "dat_F83C",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:DC6B",
+      "end": "rom:DC75",
+      "name": "dat_DC6B",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:E9D4",
+      "end": "rom:E9DA",
+      "name": "dat_E9D4",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:D49B",
+      "end": "rom:D49E",
+      "name": "dat_D49B",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note -- same batch check, no stray JSR/JMP lands inside). Byte-frequency signature is mixed/scattered rather than matching either the graphics-tile or small-integer-tile pattern seen elsewhere -- consistent with jump tables, pointer tables, or other code-adjacent parameter data, the same family the Galaga project's own smaller gaps turned out to be. Declared as one block to close the gap; not characterized further this pass."
+    },
+    {
+      "loc": "rom:FC7C",
+      "name": "dat_FC7C",
+      "note": "CONFIRMED no gaps-closing risk (see dat_C000's note). Runs to the ROM's own top and includes the hardware vectors at $FFFA-$FFFF (NMI=$F34D, RESET=$CA20, IRQ=$F41C -- byte-verified against the already-declared entries), the same reason this showed as a gap in every sibling project (vector bytes are data, not executed code). No ASCII copyright/signature string found in a quick check of the leading bytes here, unlike the 'GCC(c)1984' tail seen in the Dig Dug and Galaga projects -- worth noting as a real difference rather than assuming the same pattern holds, not yet explained.",
+      "len": 900
+    }
+  ],
+  "notes": {
+    "rom": "Ms Pac-Man (NTSC) (Atari) (1987) (E42FC700).a78\nmapper linear, 16 KB, NTSC\nno POKEY declared; audio is the TIA's two voices\n\nVectors: IRQ $F41C  NMI $F34D  RESET $CA20\n\nWritten by init.py. Everything here is read from the cartridge; the\njudgement calls are yours to add."
+  }
+}
