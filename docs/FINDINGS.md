@@ -864,6 +864,37 @@ superseded utility code rather than a distinct, undiscovered feature:
   with a row index in Y, it would seed that pair ready to feed straight
   into one of those routines.
 
+## Chasing the lives-remaining counter: a real search, a real dead end, and a bonus find
+
+Pushed on the lives-remaining counter next. A screenshot of `run-02.inp`
+confirms the manual's 5-lives claim visually -- 4 small icons at the
+bottom-left (the "extra lives in reserve" the user pointed out reading
+the icon row correctly), consistent with 5 total including the one in
+play.
+
+**The counter itself was not found, despite real effort, not a shrug.**
+There's no `LDA #$05` (or `#$04`) anywhere in the ROM as a plausible
+literal constant. A live baseline-and-diff scan of `ram_0040`-`ram_00FF`
+at the moment real play begins turned up exactly one candidate matching
+the expected value: `ram_0067 = 5`. A decisive test settled it: live-
+patching `ram_0067` to `1` mid-recording and screenshotting immediately
+before and after showed *no change* in the on-screen icon row -- ruled
+out cleanly, by fault injection rather than by guessing. The lives
+icons also don't appear to be spawned via a counted loop into
+`rom:sub_EA36` (no such loop exists anywhere in the traced code) the
+way a first guess might expect. Genuinely unresolved.
+
+**A real, verified bonus find turned up along the way.** Tracing
+`rom:sub_CCF9` (called right alongside the score-digit HUD renderer)
+turned up `FruitTrayCount` (`ram_0084`, newly named) = `min(WaveCounter,
+7) + 1` -- the classic Ms. Pac-Man "fruit tray": a row of icons at the
+bottom-*right* (distinct from the lives icons at bottom-left) showing
+every fruit type encountered so far this game. `rom:sub_CEAB` draws one
+fixed icon plus `FruitTrayCount - 1` more from an 8-entry position
+table, each spaced 24 pixels apart. **Live-verified**: a screenshot at
+frame 2,200 (wave 0) shows an empty tray; a screenshot at frame 21,500
+(wave 5) shows exactly 5 fruit icons, matching the formula precisely.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -919,8 +950,13 @@ superseded utility code rather than a distinct, undiscovered feature:
   tied directly into the already-solved ghost-fright-start mechanism.
 * ~~Extra-life threshold, if one exists in this port~~ -- **RESOLVED.**
   9,990 points (BCD `0999` at the project's x10 scale), live-verified.
-  See "The extra-life threshold, found and live-verified" above. Not
-  found: which RAM byte holds the displayed lives-remaining count.
+  See "The extra-life threshold, found and live-verified" above.
+* Which RAM byte holds the displayed lives-remaining count -- pushed on
+  directly (see "Chasing the lives-remaining counter" above): the one
+  strong candidate found (`ram_0067`) was ruled out by live fault-
+  injection, not just left unchecked. Still genuinely open, though a
+  real, verified bonus find (the fruit tray, `ram_0084`) came out of
+  the search.
 * ~~The Teddy Bear level-select starting point, and what specifically
   slows the game down when starting from it~~ -- **RESOLVED.** The
   title-screen level-select cursor seeds `WaveCounter` directly at game
