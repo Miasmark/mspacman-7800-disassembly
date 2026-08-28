@@ -918,6 +918,40 @@ table, each spaced 24 pixels apart. **Live-verified**: a screenshot at
 frame 2,200 (wave 0) shows an empty tray; a screenshot at frame 21,500
 (wave 5) shows exactly 5 fruit icons, matching the formula precisely.
 
+## UPDATE: the lives counter, actually found -- by tracing forward, not hunting
+
+The user asked directly what the extra-life counter increments once
+triggered. That question changed the search strategy -- instead of
+scanning RAM for a byte matching an expected value (which had already
+failed once, on `ram_0067`), trace *forward* from the one place already
+known to increment on a bonus life: `rom:sub_F6E8`. That led straight
+to `LivesRemaining` (`ram_00A4`, newly named) -- the same byte the
+"real dead end" above had already touched and specifically dismissed
+as "just a timing counter." That dismissal was wrong, and is corrected
+in place in `annotations.json` (`rom:CA95`, `rom:F663`, `rom:CDEE`)
+rather than quietly fixed.
+
+`rom:sub_F79E` is the lives-icon renderer: clamps `LivesRemaining` at
+5 and draws that many icons -- called at game start, during the post-
+death pause sequence, and right after the extra-life jingle. **Live-
+verified against `run-01.inp`** (`tools/probe-livesfound.lua`,
+`tools/probe-livescross.lua`): `LivesRemaining` starts at 4 (matching
+the icon tray), visibly drops across several deaths in the recording
+(4->3->2->1), then **increments from 1 to 2 at frame 8,794** -- the
+exact same frame `ExtraLifeCountdown` is seen resetting from a just-
+crossed-zero value to a fresh ~9,962-point countdown, i.e. the extra-
+life trigger firing live, in the same recording, cross-confirmed by
+two independent bytes changing on the same frame. Later in the same
+recording, `LivesRemaining` wraps from 0 to `$FF` (negative) on a final
+death, triggering the game-over/respawn sequence before resetting to 4
+for the next game -- the complete lives lifecycle, all live-verified
+in one recording.
+
+**Direct answer to the question asked**: once the extra-life trigger
+fires, it increments `LivesRemaining` (`ram_00A4`) -- the exact same
+counter the on-screen lives-icon row is drawn from, clamped at 5 icons
+and redrawn by `rom:sub_F79E` every time it changes.
+
 ## Pushing on dat_C000: narrowed, not confirmed
 
 Tried to settle the last big open item -- whether the large graphics-
@@ -1011,12 +1045,16 @@ untested.
 * ~~Extra-life threshold, if one exists in this port~~ -- **RESOLVED.**
   9,990 points (BCD `0999` at the project's x10 scale), live-verified.
   See "The extra-life threshold, found and live-verified" above.
-* Which RAM byte holds the displayed lives-remaining count -- pushed on
-  directly (see "Chasing the lives-remaining counter" above): the one
-  strong candidate found (`ram_0067`) was ruled out by live fault-
-  injection, not just left unchecked. Still genuinely open, though a
-  real, verified bonus find (the fruit tray, `ram_0084`) came out of
-  the search.
+* ~~Which RAM byte holds the displayed lives-remaining count~~ --
+  **RESOLVED.** `LivesRemaining` (`ram_00A4`) -- found by tracing
+  forward from the extra-life trigger instead of hunting for a byte
+  value (the first attempt, `ram_0067`, had already been ruled out by
+  fault injection). Live-verified across a full lives lifecycle in one
+  recording: starts at 4, drops on several deaths, increments on a
+  live-confirmed extra-life award, and wraps negative on the final
+  death. See "UPDATE: the lives counter, actually found" above. A real,
+  verified bonus find (the fruit tray, `ram_0084`) also came out of the
+  search.
 * ~~The Teddy Bear level-select starting point, and what specifically
   slows the game down when starting from it~~ -- **RESOLVED.** The
   title-screen level-select cursor seeds `WaveCounter` directly at game
