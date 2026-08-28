@@ -150,8 +150,12 @@ the same role gameplay hints played in every sibling project so far:
   concrete, checkable claim: find whatever advances the level-name/maze
   index, and see whether it genuinely caps out (clamped, not wrapping or
   randomizing) rather than assuming the manual's own description holds
-  for this port -- the exact kind of manual-vs-ROM divergence the
-  Galaga project ran into more than once.
+  for this port. **RESOLVED -- see "The Banana lock, solved" below, and
+  it turned out not to be a manual-vs-ROM divergence at all:** the
+  "random fruit" mechanism is real and works as described; it's tied to
+  the player's own title-screen starting-level choice in a way that
+  produces a genuine always-Banana outcome specifically when Banana was
+  that starting choice.
 
 ## First live pass: the fruit point-value table, found by grepping for `SED` and confirmed exactly against the manual
 
@@ -208,6 +212,50 @@ standing; what `ram_2124` and its table actually are is still open. This
 is the natural next step toward the user's third hint (whether the
 level-name sequence really clamps at Banana).
 
+## The Banana lock, solved: not a manual-vs-ROM divergence at all
+
+Followed the natural next step straight through, and it turned out to
+be a much better answer than "the manual is wrong about this port" --
+the mechanism is exactly what the manual describes, and the user's own
+specific playthrough triggered a genuine edge case of it.
+
+`rom:sub_D508` is where `CurrentFruitType` gets chosen for a new level:
+below wave 8, it's set directly to the wave number -- a clean march
+through the 8 named fruits, matching the manual's own sequence. At wave
+8 and beyond, the manual's own claim ("random fruit mazes") kicks in
+structurally: a PRNG call, masked to 0-7, picks a fruit -- **but the
+result has to satisfy `result >= FruitTypeFloor` (`ram_0040`, newly
+named) via a rejection-sampling retry loop, or it's discarded and
+re-rolled.**
+
+`FruitTypeFloor` turns out to be the exact same byte the title screen's
+level-select cursor writes to -- the "TEDDY BEAR" / "PRETZEL" / etc.
+setting the user can cycle through with the joystick before starting a
+game (`rom:sub_E85B` increments it up to a clamp of 7; `rom:sub_E86A`
+decrements it down to a floor of 0). Whatever starting level the player
+picks becomes a **permanent lower bound on every "random" fruit draw for
+the rest of that game.** Starting from Banana (`FruitTypeFloor = 7`)
+leaves exactly one value that can ever pass the retry check: 7. Every
+wave-9-plus draw is Banana -- forced, not by chance.
+
+**Live-confirmed and cross-validated across all four recordings**, each
+one landing on a different point along the same mechanism:
+
+| recording | starting level | `FruitTypeFloor` | fruit types seen post-wave-8 |
+|---|---|---|---|
+| `run-01` | Banana | 7 | **locked at 7 (Banana)** for the rest of the recording -- tens of thousands of frames, many waves |
+| `run-03` | Pear | 6 | oscillates between 6 and 7 only -- the exact two values `>=6` |
+| `run-04` | Pretzel | 5 | oscillates among 5, 6, 7 |
+| `run-02` | Teddy Bear | 0 | genuinely varied (0, 1, 2, 3, 4, 6 all seen) -- the unconstrained case |
+
+The pattern degrades exactly as the formula predicts as the starting
+floor rises, from "fully random" at floor 0 to "always the same fruit"
+at floor 7. **The manual's "random fruit" claim is true in general** --
+this project's own earlier-flagged "discrepancy" was really just one
+specific playthrough's starting choice producing a degenerate,
+single-outcome case of a genuinely-random mechanism, not a bug, and not
+a port divergence from the manual after all.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -245,11 +293,14 @@ level-name sequence really clamps at Banana).
 * Where the intermission animations live, and whether they really do
   trigger after the Strawberry and Apple level wins specifically -- the
   user's second hint, not yet investigated.
-* Whether the maze/level name sequence genuinely clamps at Banana rather
-  than moving to "random fruit" as the manual describes -- the user's
-  third hint. Directly connected to what's now found: `CurrentFruitType`
-  (`ram_2116`) is confirmed as the live index into the fruit-value table,
-  and whether it can exceed 7 is the concrete next check.
+* ~~Whether the maze/level name sequence genuinely clamps at Banana
+  rather than moving to "random fruit" as the manual describes~~ --
+  **RESOLVED, and not a manual-vs-ROM divergence at all.** See "The
+  Banana lock, solved." The random-fruit mechanism the manual describes
+  is real and confirmed; a rejection-sampling retry loop ties it to
+  whatever starting level the player picked on the title screen,
+  producing a degenerate always-Banana outcome specifically when Banana
+  itself was the starting choice -- exactly the case in `run-01.inp`.
 * What `ram_2124` and the large table it indexes (`dat_E342` onward)
   actually are, now that "level index into maze data" is retracted as
   the likely explanation.
