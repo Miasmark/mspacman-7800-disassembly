@@ -1302,5 +1302,68 @@ independently confirming tiles `$30`-`$45` as the wall pieces.
   `ram_2124` is each actor's own live position coordinate, seeded from
   the init-position table `dat_DCCD`/`dat_DCD1`, and separately reused
   by `rom:sub_E0FB` to hold the small intermission/maze variant index.
-* The private reference source stays unconsulted, per the plan -- see
-  `README.md`.
+* ~~The private reference source stays unconsulted, per the plan~~ --
+  **NOW CONSULTED,** after the independent work was substantially
+  complete. See "Cross-checking against the historical reference" below.
+
+
+## Cross-checking against the historical reference
+
+With the independent investigation essentially complete, a privately-held
+historical development source for this game was consulted -- the same
+archive the sibling projects used, and under the same discipline: as a
+*check only*, never as the origin of a finding, never quoted or copied
+into this repo, and with every point re-verified against this ROM's own
+bytes. Development source is not necessarily the shipped product, so
+disagreements are treated as questions to settle against the ROM, not as
+automatic corrections.
+
+**Corroborated exactly.** The reference independently confirms, in full,
+the largest and most recent finding here -- the character set. It places
+the font at the same origin, uses the same 6-bytes-per-glyph cell, and
+its own code-map matches the tile assignment derived here purely by
+decoding string tables: maze walls, then the alternate digit set, blank,
+dot, power dot, primary digits, `A`-`Z`, and the three punctuation
+marks, all at exactly the codes worked out from the ROM. The text
+renderer matches structurally too: same four parallel parameter tables
+(offset, length-minus-one, screen zone, column), the same two message
+banks, and -- a detail derived here from a single `SBC` instruction --
+the same split between banks at message index `$13`. All four ghost
+targeting personalities match (direct chase; a fixed offset ahead of
+Ms. Pac-Man; the doubled vector taken relative to the red ghost; and a
+distance-gated retreat to a corner). The "Banana lock" matches
+precisely, down to the structure: sequential fruit below level 8, then a
+masked random draw retried until it meets a floor equal to the level the
+player chose at the title screen -- which the reference's own comment
+describes in the same terms this project arrived at independently.
+
+**Corroborated after a second look, which is why it was worth
+re-asking.** A first, summarised reading of the reference suggested the
+red ghost's dot-count speed-up was *not* gated on the other ghosts being
+out of the pen -- contradicting the gate found here on the fourth
+ghost's state byte. Querying the reference directly on that specific
+code rather than accepting the summary showed the gate is present and
+matches this ROM exactly, including the detail that the comparison uses
+the *second* of a threshold pair. The ROM reading stood; the summary was
+imprecise. Worth recording as a caution: the reference is being read
+through a summarising layer, so an apparent disagreement is at least as
+likely to be summary error as a real source difference.
+
+**One unreconciled numeric difference.** The reference initialises the
+"dots until fruit appears" counter to `$70` (112). This ROM initialises
+it to `$38` (56) at `rom:CC28`, and that value is not merely read from
+the listing but live-verified: across a full recording, `DotsUntilFruit`
+and `DotsEatenCount` move in exact lockstep with a constant sum of 56.
+For *this* ROM the value is 56. Whether the reference figure reflects a
+development-stage setting later changed, or a variable with different
+semantics than the similarly-named one here, is not resolved -- and is
+left open rather than forced to agree.
+
+**Refinements the reference contributes.** Three places where it is more
+specific than the independent work, none contradicting it: the wall
+tiles split into maze walls proper and a distinct group for the ghost
+pen entrance and pen walls; the second power-dot code is specifically
+the *flashing* state rather than a duplicate; and the ambush ghost's
+offset and the corner-retreat ghost's distance threshold are concrete
+tile counts rather than the unquantified "fixed offset" and "distance
+gate" described here.

@@ -22,10 +22,16 @@ the project, so read it as a starting map, not a finished one.
 same knowledge.
 
 A privately-held, unlicensed historical source for this game exists (the
-same archive the sibling projects' reference sources came from), following
-the same methodology those projects settled into: hold off consulting it
-until independent work is substantially done, then use it strictly as a
-check -- never as the origin of a finding, never quoted or copied in.
+same archive the sibling projects' reference sources came from), and was
+handled the way those projects settled on: held off until the independent
+work was substantially complete, then used strictly as a check -- never as
+the origin of a finding, never quoted or copied in. That cross-check has
+now been done and is written up at the end of `docs/FINDINGS.md`: broad
+corroboration (the character set, the text renderer, all four ghost
+targeting personalities, the fruit-selection floor), one apparent
+disagreement that dissolved on closer questioning and left the ROM reading
+standing, and one genuine numeric difference left unreconciled rather than
+forced to agree.
 
 Working discipline, same as the sibling projects: every claim about what a
 byte range does should be checked live before it's trusted, not just
