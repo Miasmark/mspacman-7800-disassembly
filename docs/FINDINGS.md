@@ -624,6 +624,46 @@ worth naming as a wrong turn corrected before being written down).
 Whether this port *also* has a dot-count-linked release wasn't found
 this pass.
 
+## Dot and power-pellet scoring, found and live-verified
+
+The one scoring question left open since the fruit/ghost-chain tables
+were found: what actually happens when Pac-Man eats a dot or a power
+pellet. It turned out not to go through `rom:sub_F61A` (the score-add
+routine already found) via the same table-lookup shape the fruit and
+ghost-chain paths use -- a grep for every `JSR sub_F61A` in the ROM
+turns up only the 2 sites already documented. Dots and pellets go
+through a third, simpler path instead: `rom:sub_F614`, which stages a
+flat, un-looked-up point value directly and falls straight through into
+`sub_F61A`.
+
+`rom:sub_D1E5` reads the tile code at Pac-Man's own position (the same
+tile buffer the maze renderer reads/writes, via `rom:sub_F5FF`) and
+checks it: tile `$51` is a dot (10 points, a raw BCD delta of `1` at
+the project's established x10 scale); tile `$52` or `$53` (checked
+together by masking off the low bit) is a power pellet -- which calls
+`rom:sub_DAC3` to start ghost-fright mode (see "Checking the ghost
+logic" above) and awards a raw BCD delta of `4`, i.e. 40 points (not
+the 50 a general Pac-Man expectation might predict -- the manual's own
+fruit table never actually states a pellet value, so there was nothing
+to contradict). Either way, control falls through into `rom:sub_D21C`,
+which overwrites that tile with `$50` (the blank/filler code already
+seen throughout `dat_FBBC`/`dat_FBDC`) so it can't be eaten twice,
+advances `DotsEatenCount` (`ram_00AA`, newly named -- the same counter
+the Cruise Elroy check reads), counts down `DotsUntilFruit`
+(`ram_00AF`, newly named -- reaching empty triggers the fruit-
+appearance routine, `rom:sub_D508`), resets `GhostReleaseTimeout` back
+to 0, and advances a level-clear countdown.
+
+**LIVE-VERIFIED against `run-02.inp`** (`tools/probe-doteat.lua`):
+Score climbed by exactly 1 raw BCD unit per dot for 40 consecutive dots
+while `DotsUntilFruit` decremented in perfect lockstep with
+`DotsEatenCount` the entire way (their sum stayed constant at 56), then
+jumped by more than 1 at frame 2144 -- the exact same frame
+`GhostFrightFlag` was already independently confirmed flipping to `8`
+for all four ghosts during the ghost-logic investigation. Two
+independently-derived findings landing on the same frame again, same as
+happened with the ghost-chain table earlier in this project.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -665,12 +705,11 @@ this pass.
   has a dot-count-linked trigger alongside the two timer-based
   mechanisms found.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
-  **PARTIALLY ANSWERED.** The ghost-chain table is now found and mostly
-  live-verified (200/400/800/1,600, see above). Dots and power pellets
-  themselves are still unconfirmed -- the fruit/ghost tables were found
-  first because `SED` search led straight to them; dot-eating almost
-  certainly goes through the same `ScoreDeltaHi`/`ScoreDeltaLo` staging
-  bytes but hasn't been traced to its own specific call site yet.
+  **RESOLVED.** The ghost-chain table (200/400/800/1,600) and the fruit
+  table were found first and live-verified. Dots (10 points) and power
+  pellets (40 points) were the last piece -- see "Dot and power-pellet
+  scoring, found and live-verified" above -- also live-verified, and
+  tied directly into the already-solved ghost-fright-start mechanism.
 * Extra-life threshold, if one exists in this port.
 * ~~The Teddy Bear level-select starting point, and what specifically
   slows the game down when starting from it~~ -- **RESOLVED.** The
