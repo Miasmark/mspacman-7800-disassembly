@@ -984,6 +984,52 @@ either -- still an open graphics-signature guess, just with two more
 specific identities ruled out by live tracing rather than left
 untested.
 
+## dat_C000, actually confirmed as graphics -- found with the user, live, from a published page
+
+The push above narrowed dat_C000 by elimination three times without
+ever landing a positive identification. That changed once the
+rendering attempts were published as a page and the user started
+reading the images back directly -- catching real signal a
+byte-frequency histogram alone couldn't surface, and steering the next
+decode attempt with specifics ("the top almost looks like 4 ghosts",
+"every other column is dead black or grey, try 8 bits/pixel") rather
+than a vague "keep trying."
+
+That feedback pointed at a 240-ish-row-10-to-20 range in a 24-bytes/row
+rendering. Pulling the corresponding bytes and inspecting them directly
+(not just rendering and eyeballing) found something decisive: **every
+byte in a clean 242-byte run (`rom:C0D2`-`rom:C1C4`, offset 210-452 into
+the block) is built entirely from 2-bit pairs that are binary `00` or
+`11` -- never `01` or `10`.** That's not a rendering artifact or a
+lucky guess at width -- it's a structural property of the bytes
+themselves, independent of any width/orientation choice, and it means
+only 2 of the 4 possible palette indices are used anywhere in that run:
+the signature of genuine 2-color (not 4-color) graphics data, not a
+coincidental byte pattern. Decoded at 2 bits/pixel, 24 bytes/row, in
+clean black-and-white (since only those 2 indices ever appear), that
+run shows four rounded-top, scallop-bottomed silhouettes -- ghost-
+shaped -- matching exactly what the user had already spotted in a
+noisier 4-level rendering.
+
+The same binary-pair property holds for 48% of the bytes across the
+*whole* 2,592-byte block (scattered, not one continuous run), with two
+other substantial clean runs at `rom:C825`-`rom:C8ED` (200 bytes) and
+`rom:C948`-`rom:CA20` (216 bytes, running right up to the `RESET`
+vector) not yet independently rendered. The shapes' internal
+"dashed"/textured look, rather than a solid fill, is most likely
+deliberate checkerboard dithering rather than a decode error still
+being slightly wrong -- this block's two single most common bytes
+overall (`$55`, `$AA`) are themselves perfect alternating-bit patterns,
+consistent with a 2-color dither used to fake an intermediate shade on
+real hardware.
+
+This is the first *positive* confirmation dat_C000 has had, after three
+rounds of purely eliminative narrowing. Still open: the shapes show
+mild residual diagonal drift (24 bytes/row is close but maybe not
+exactly the right stride), exactly which game element these four
+silhouettes are, and whether the other two clean runs decode as
+cleanly once actually rendered.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -992,14 +1038,17 @@ untested.
   intermission-actor and actor-type-script parameter tables. The real
   maze wall layout lives in the `dat_FC7C` tail block as a compact
   bitmap, decoded via `dat_FBBC`/`dat_FBDC`.
-* Whether the large graphics-signature block (`dat_C000`) really is
-  character/sprite tile data -- pushed on directly with a live Maria
-  display-list trace (see "Pushing on dat_C000" above): ruled out as
-  the maze walls specifically, and doesn't appear reachable via the
-  game's one `CHARBASE` setting either. Still not confirmed what it
-  actually is -- narrowed by elimination three times over now (maze
-  bitmap, maze color data, and the maze walls' own graphics), not by
-  a positive identification.
+* ~~Whether the large graphics-signature block (`dat_C000`) really is
+  character/sprite tile data~~ -- **CONFIRMED, partially.** See
+  "dat_C000, actually confirmed as graphics" above: a 242-byte run
+  (`rom:C0D2`-`rom:C1C4`) is structurally proven to be genuine 2-color
+  graphics data (every byte's 2-bit pairs are binary `00`/`11`, never
+  `01`/`10`), decoding into four ghost-shaped silhouettes -- found
+  collaboratively with the user reading a published rendering page
+  directly rather than a byte-frequency guess. Still open: two more
+  clean runs in the same block not yet rendered, exactly which game
+  element the silhouettes are, and the mild residual diagonal drift
+  suggesting the row width isn't quite exact yet.
 * ~~What each of the nineteen smaller mixed-signature blocks actually
   is~~ -- **RESOLVED.** 14 of the 19 traced to a real, callsite-
   confirmed identity in the data-blocks pass (see the table above), on
