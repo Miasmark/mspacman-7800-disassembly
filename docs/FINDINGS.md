@@ -573,18 +573,41 @@ same per-wave table (`dat_DCF9`) -- not two separate mechanics, one
 elegant reuse.
 
 **Mode switching (scatter<->chase) is a queued, timed handoff.**
-`rom:sub_D69B` (once per frame) advances an elapsed-time counter once
-per full movement-cadence cycle and, once it reaches a scheduled target
+`rom:sub_D69B` (once per frame) advances an elapsed-time counter pair
+(`ram_00FB`/`ram_00FC`) and, once it crosses a scheduled target
 (`ModeTimerTargetLo`/`Hi`, `ram_216C`/`ram_216D`), calls `rom:sub_DB35`:
-sets `ChaseModeFlag` back to 0 and forces every ghost still roaming
-normally to reverse direction -- the classic arcade tell of a mode
-switch -- then shifts a single queued next-duration
-(`ModeTimerNextLo`/`Hi`, `ram_216E`/`ram_216F`) into the current target.
-**Not found this pass:** where the actual duration *values* get loaded
-into that schedule -- nothing in the ~52% of code traced so far writes
-to `ram_216C`-`ram_216F` except this shift-and-reset logic itself, so
-the real scatter/chase timing numbers are still unknown; they likely
-live in the ~48% of ROM not yet reached as code.
+sets `ChaseModeFlag` back to 0 (or, symmetrically, back to 1 next time)
+and forces every ghost still roaming normally to reverse direction --
+the classic arcade tell of a mode switch -- then shifts a single queued
+next-duration (`ModeTimerNextLo`/`Hi`, `ram_216E`/`ram_216F`) into the
+current target. The firing check isn't a clean 16-bit compare -- it's
+two independent 8-bit gates ANDed together, with `ram_00FC` wrapping
+0-255 repeatedly and `ram_00FB` only advancing on that wrap -- so once
+`ram_00FB` first clears its threshold (permanently, since it only
+grows), the effective trigger becomes "next time `ram_00FC`'s repeating
+climb crosses its own threshold".
+
+**UPDATE: the schedule's actual values, found and live-verified.**
+`dat_DF21`'s per-maze-color-variant 32-byte blocks are dual-purpose --
+their last 4 bytes double as the mode-timer's initial schedule seed,
+copied into `ram_216C`-`ram_216F` by the exact same `rom:sub_DE8B` copy
+that installs the wall-color/attribute data (see "Nailing down the data
+blocks" above). Confirmed with a second probe
+(`tools/probe-modeschedule2.lua`) against `run-02.inp`: for
+`MazeColorVariant` 0, the seed is exactly `$07,$A4,$19,$54`, landing in
+`ram_216C`-`ram_216F` at the observed wave-start frame (1435) --
+matching the byte values hand-decoded from `dat_DF21` exactly. The
+first two scheduled switches (at frames 4717 and 6651) consume that
+seed pair, after which `rom:sub_DB35`'s own code resets `ModeTimerNext`
+to the `$FF` sentinel -- but live data shows it getting **refilled**
+anyway, alternating between `$01,$A4` and `$06,$54` at every subsequent
+switch for the rest of the recording (16+ switches total, well past
+what a 2-entry queue should allow). **Not found:** the refill's write
+site. No instruction anywhere in the ~52% of code traced so far writes
+anything but `$FF` into `ram_216E`/`ram_216F`, so whatever refills it
+with real values lives in the ~48% not yet reached as code -- a
+concrete, addressable lead (the exact bytes and timing are now known)
+for whoever picks this up next.
 
 **Ghost-house release has two mechanisms, not one.** The normal path
 (found earlier) is `dat_E8AA`'s per-slot staggered thresholds
@@ -631,13 +654,16 @@ this pass.
   handoff, and a second ghost-house-release mechanism -- and the core
   state machine (fright start/end, the eaten-ghost state cycle, the
   chase/scatter toggle) is now live-verified against `run-02.inp`, not
-  just statically traced. Not found: the actual scatter/chase duration
-  values (the mechanism exists and is confirmed live to actively
-  toggle, but the schedule's numbers don't seem to be written anywhere
-  in the ~52% of code traced so far); the Cruise Elroy speed-boost
-  effect (the code path is identified but not checked against an actual
-  speed change); and whether ghost-house release also has a dot-count-
-  linked trigger alongside the two timer-based mechanisms found.
+  just statically traced. The scatter/chase duration schedule's *initial*
+  values are now found too (seeded from `dat_DF21`'s tail bytes -- see
+  "Mode switching" above), though what refills the schedule after the
+  first two switches is still an open, now precisely-scoped lead (known
+  exact byte values and timing, just not the write site, which must be
+  in the ~48% of code not yet reached). Also still open: the Cruise
+  Elroy speed-boost effect (the code path is identified but not checked
+  against an actual speed change); and whether ghost-house release also
+  has a dot-count-linked trigger alongside the two timer-based
+  mechanisms found.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **PARTIALLY ANSWERED.** The ghost-chain table is now found and mostly
   live-verified (200/400/800/1,600, see above). Dots and power pellets
