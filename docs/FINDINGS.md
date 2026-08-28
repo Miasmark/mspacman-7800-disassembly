@@ -372,24 +372,123 @@ directly from the title screen instead of by playing through it.
 This closes all three of the user's original gameplay hints, plus the
 intermission-code half of hint 2 found separately above.
 
+## Nailing down the data blocks
+
+The user asked to push on the remaining unclassified data blocks. Of the
+23 originally-declared blocks, this pass traced every caller for every
+block that had one (most did -- only 4 tiny blocks turned out to have
+*no* static caller anywhere), read the calling code, and cross-checked
+the byte content against what that code does with it. Almost none of it
+turned out to be a literal maze grid; instead this ROM's "level data" is
+mostly the *machinery around* the mazes -- graphics-pointer tables,
+collision math, actor-parameter tables -- with the actual maze wall
+layout hiding in compact bitmap form inside the tail block.
+
+**The real maze layout, found.** `rom:sub_FC18` indexes a 4-entry
+pointer table by `MazeColorVariant` to get one of `$FCC8`/`$FD7C`/
+`$FE30`/`$FEE4` (all inside the `dat_FC7C` tail block) and copies 128
+bytes from there into `ram_1C00` (`MazeBitmapBuffer`, newly named) -- a
+compact bitwise encoding of the maze's walls, one bit per cell.
+`rom:sub_FC00` reads it a byte at a time and unpacks each byte's 8 bits
+through `rom:sub_FBAA`, which uses `dat_FBBC`/`dat_FBDC` (autotile-style
+lookup tables) to pick the correct wall-corner/edge tile code for each
+bit position and pokes it into the screen's tile buffer via a pointer
+that advances by 28 bytes (the maze's row width) per row. This is the
+actual maze-layout data the user expected most of the ROM to hold --
+just encoded as a compact wall bitmap decoded through an autotiler, not
+stored as a literal per-cell grid the way the original guess assumed.
+`dat_FBBC` and `dat_FBDC` hold the *same set* of tile-code values in
+genuinely different orders (not a mirror of each other), consistent
+with Ms. Pac-Man's mazes not being simple left-right mirrors the way
+the original Pac-Man's was.
+
+**This also fully overturns the original "maze data" guess.** Both
+blocks originally guessed as small-integer maze/collision data
+(`dat_E342`, `dat_EB75`) turned out to be something else entirely, once
+their actual callers were traced instead of just their byte-frequency
+signature:
+
+* `dat_E342` is read by `rom:sub_E159` via `LDX ram_2124` with *no*
+  index -- i.e. actor slot 0's own position byte, which `rom:sub_E0FB`
+  sets to a small 0/1/2 maze-variant index right before calling this.
+  `dat_E342` ($02,$04,$08 -- power-of-two flags) and sibling `dat_E345`
+  ($03,$06,$09) select per-maze-variant type/flag parameters for the two
+  actors `sub_E159` spawns. The many other small 3-entry tables declared
+  across this whole 759-byte span follow the same shape and almost
+  certainly supply the rest of the position/type parameters for the
+  already-solved intermission animation (`rom:sub_E0FB`/`rom:sub_E168`,
+  see above) -- this whole block is intermission-actor setup data.
+* `dat_EB75`/`dat_EB8A` form a type-to-pointer table (low/high bytes)
+  read by `rom:sub_EB3A`, part of the actor-management family around
+  `sub_EA36`/`ActorActiveFlags`. Given an actor-type code, it produces a
+  16-bit ROM pointer; the immediately neighboring `sub_EB1E` reads a
+  similar pointer into `AUDV0` (the sound volume register), suggesting
+  these per-type pointers lead to each actor type's own animation-and-
+  sound script.
+
+This also resolves the earlier retraction about `ram_2124`: `sub_DA32`
+(called at game/life reset) copies a 4-entry initial-position table
+(`dat_DCCD`/`dat_DCD1`) into `ram_2120,X`/`ram_2124,X` for the 4 actor
+slots. `ram_2124,X` really is each actor's own live position coordinate
+-- the original retraction was right that it's not a small level index,
+but the large values seen live (47/38/111) are just the actor having
+moved since its small reset value was set, not evidence against a
+position byte at all.
+
+**Everything else traced this pass, briefly:**
+
+| Block | What it turned out to be |
+|---|---|
+| `dat_F52C`/`dat_F54B` | Per-row Maria graphics-pointer table (lo/hi), read live inside `ENTRY_Nmi`'s display-list construction every vblank. |
+| `dat_F8C6` | Sprite/character-ID -> frame-group remap table, read by the shared sprite dispatcher `sub_F890` (~19 call sites). |
+| `dat_DF21` | Per-maze-color-variant wall attribute/palette data, copied into the maze's color RAM by `sub_DE8B` -- likely the manual's "four maze patterns" in ROM form. |
+| `dat_D614` | A 4-step (-1,-1,+1,+1) sub-pixel movement-smoothing delta cycle. |
+| `dat_D3E1`/`dat_D3ED` | Per-direction/phase starting-offset table for (re)spawning an actor. |
+| `dat_E0DD` | A 6-entry diamond-shaped collision-hitbox falloff table, shared by both the fruit-eating and ghost-collision distance checks. |
+| `dat_F5A6` | The joystick raw-SWCHA-nibble to direction-code decode table. |
+| `dat_E9F7` | The standard 4-direction (+1,0,-1,0) unit movement-delta table. |
+| `dat_E8AA` | Per-ghost-slot staggered ghost-house release-delay thresholds (9/12/15/18) -- a first concrete hint at ghost-release timing. |
+| `dat_DC6B`/`dat_DC70` | Already known from the speed investigation -- the movement-cadence checkpoint tables `sub_DC44` uses. |
+
+**Left genuinely open, honestly:**
+
+* `dat_E970` -- fills a 32-byte RAM buffer pair, contains embedded ROM-
+  address-shaped byte pairs mixed with small integers; plausibly a HUD/
+  attract-text row template, not decoded further.
+* `dat_DE73` -- a 4x4 matrix with a distinctive -1-diagonal/+1-band
+  shape, read inside actor-targeting math; plausible ghost-AI turn-bias
+  table, not traced to a specific decision.
+* Four tiny blocks (`dat_F83C`, `dat_E9BD`, `dat_E9D4`, `dat_D49B`) have
+  **zero static callers anywhere** in the traced code, yet each decodes
+  cleanly as a small, coherent 6502 routine (a graphics-pointer reader,
+  a generic page-copy loop, an index-times-4 helper, and a bare `JMP`
+  respectively). No indirect-jump instruction (`JMP (...)`/`JSR (...)`)
+  exists anywhere in the code traced so far that could explain reaching
+  any of them dynamically -- so each is flagged, not asserted, as either
+  genuinely unreached/dead code or a coincidental decode of real data.
+* `dat_C000` -- still just a byte-frequency guess (graphics/tile sheet),
+  though two other candidate identities (maze bitmap, maze color data)
+  are now ruled out by this pass, narrowing what it's left to be.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
-  `dat_EB75`) really are maze/level layout data~~ -- **PARTIALLY
-  ANSWERED, and probably wrong as originally framed.** `dat_E342` is
-  read via `rom:sub_E159`, indexed by `ram_2124` -- but `ram_2124` was
-  checked live and does *not* behave like a small per-level index (see
-  above), so this is more likely a different kind of table entirely
-  (possibly per-object or per-frame data, given the values seen). Not
-  maze layout in the "2D grid of wall/path tiles" sense originally
-  guessed. What it actually is remains open.
+  `dat_EB75`) really are maze/level layout data~~ -- **RESOLVED, and
+  the answer is no.** See "Nailing down the data blocks" above: both are
+  intermission-actor and actor-type-script parameter tables. The real
+  maze wall layout lives in the `dat_FC7C` tail block as a compact
+  bitmap, decoded via `dat_FBBC`/`dat_FBDC`.
 * Whether the large graphics-signature block (`dat_C000`) really is
   character/sprite tile data -- not yet rendered or cross-checked
-  against known 7800 graphics-mode bit-plane conventions.
+  against known 7800 graphics-mode bit-plane conventions. Two other
+  candidate identities (maze bitmap, maze color/attribute data) were
+  ruled out this pass, narrowing but not yet confirming it.
 * ~~What each of the nineteen smaller mixed-signature blocks actually
-  is~~ -- **ONE RESOLVED.** `dat_CF51` is confirmed graphics/display-list
-  data, copied into Maria's working display area at maze-load time (see
-  "The maze-change schedule" above). The other eighteen remain open.
+  is~~ -- **MOSTLY RESOLVED.** 14 of the 19 traced to a real, callsite-
+  confirmed identity this pass (see the table above), on top of
+  `dat_CF51` resolved earlier. 4 tiny blocks remain genuinely open --
+  no static caller exists anywhere, so their code-shaped byte content is
+  flagged as a hypothesis, not a finding (see above).
 * Why no `GCC(c)1984`-style signature string turned up in the tail
   block, unlike both sibling 16K/32K projects that checked.
 * Ghost behavior mechanics beyond what the manual states (chase/scatter/
