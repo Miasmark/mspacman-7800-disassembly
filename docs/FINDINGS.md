@@ -691,6 +691,37 @@ for all four ghosts during the ghost-logic investigation. Two
 independently-derived findings landing on the same frame again, same as
 happened with the ghost-chain table earlier in this project.
 
+## The extra-life threshold, found and live-verified
+
+The last item on this project's original open-questions list.
+`ExtraLifeCountdown` (`ram_004A`/`ram_004B`, newly named -- a 2-byte BCD
+counter sitting immediately after `Score` in RAM) is seeded at game
+start from the tail of `dat_D04C` (`$09,$99`, i.e. BCD `0999`) by
+`rom:sub_CDD0` -- the same routine that zeroes the score itself, since
+`dat_D04C`'s first 4 bytes are the score's own zeroed initial value and
+the last 2 are this countdown's seed. Every score award (via
+`rom:sub_F61A`) also subtracts the same points from this countdown in
+the project's established x10-scaled BCD units; once it goes negative,
+`rom:sub_F663` fires `rom:sub_F6E8` -- a bonus-life effect/jingle via
+`rom:sub_EA36`. At the x10 scale, BCD `0999` is **9,990 points** -- close
+to but not exactly the classic arcade's round 10,000, which is fine:
+this port's own threshold is simply what it is. `rom:sub_F67E` is the
+identical mechanism for player 2.
+
+**LIVE-VERIFIED against `run-02.inp`** (`tools/probe-extralife.lua`):
+`ExtraLifeCountdown` starts at exactly `0999` and decrements by the
+exact point value of every scoring event seen -- 1 per dot, 4 at the
+power-pellet frame (matching the newly-found 40-point pellet value
+again), and larger drops matching each already-verified ghost-eaten
+frame. The recording doesn't run long enough to see the threshold
+actually cross zero, so the bonus-life trigger itself isn't observed
+firing, but the countdown mechanism is fully confirmed. Not found:
+which specific RAM byte holds the on-screen "lives remaining" count
+that presumably increments when `sub_F6E8` fires -- it touches
+`ram_00A3`/`ram_00A4`, but those are also reused as general level-
+transition timing counters elsewhere, so they're likely just borrowed
+for jingle/pause timing rather than being the lives counter itself.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -732,7 +763,10 @@ happened with the ghost-chain table earlier in this project.
   pellets (40 points) were the last piece -- see "Dot and power-pellet
   scoring, found and live-verified" above -- also live-verified, and
   tied directly into the already-solved ghost-fright-start mechanism.
-* Extra-life threshold, if one exists in this port.
+* ~~Extra-life threshold, if one exists in this port~~ -- **RESOLVED.**
+  9,990 points (BCD `0999` at the project's x10 scale), live-verified.
+  See "The extra-life threshold, found and live-verified" above. Not
+  found: which RAM byte holds the displayed lives-remaining count.
 * ~~The Teddy Bear level-select starting point, and what specifically
   slows the game down when starting from it~~ -- **RESOLVED.** The
   title-screen level-select cursor seeds `WaveCounter` directly at game
