@@ -470,6 +470,137 @@ position byte at all.
   though two other candidate identities (maze bitmap, maze color data)
   are now ruled out by this pass, narrowing what it's left to be.
 
+## Checking the ghost logic
+
+Asked to check on the ghost behavior beyond what the manual states. This
+turned into the richest single trace of the project so far -- most of
+the classic arcade Pac-Man ghost AI is intact and identifiable in this
+port, right down to the four ghosts' distinct targeting personalities --
+and, unlike most of the data-block work, it didn't stay a purely static
+trace: a probe (`tools/probe-ghostlogic.lua`) against `run-02.inp`
+confirmed the core state machine live.
+
+**Two independent per-ghost bytes drive everything**, both 4-slot arrays
+(one entry per ghost, X=0-3):
+
+* `GhostState` (`ram_2138,X`, newly named) -- the ghost's high-level
+  situation: 0 = normal roaming, 1 = eaten, eyes heading back to the
+  house, 2 = arrived at the door/re-entering, 3 = bobbing inside the
+  house before settling, 4 = confined, waiting to be released.
+* `GhostFrightFlag` (`ram_2140,X`, newly named) -- independent of state:
+  `$00` = not frightened, `$08` = frightened and vulnerable (the exact
+  value the eaten-ghost scoring check at `rom:E078` requires -- CONFIRMED
+  by the code, not just a guess), `$10` = set immediately after this
+  specific ghost gets eaten, as part of its own state-1 transition (an
+  earlier working guess that `$10` meant a "flashing, about to expire"
+  warning sub-state didn't survive closer tracing and is retracted here
+  rather than left standing).
+
+**LIVE-VERIFIED against `run-02.inp`.** All four `GhostFrightFlag`s flip
+`0`->`8` in the same frame (frame 2144 -- the same frame the earlier
+speed investigation identified as where real, non-attract-demo play
+begins) -- a single, simultaneous fright-start event as predicted.
+`GhostFrightFlag` hits exactly `16` at frames 2240, 2493, and 2614 --
+matching, near-exactly (within a frame, from sampling at frame
+boundaries), the three ghost-eaten events *already* live-verified
+independently back when the ghost-chain point table was found (frames
+2239/2492/2613, see `rom:E084`'s comment) -- two independently-derived
+pieces of evidence landing on the same frames. `GhostState` for the
+eaten slot then runs exactly the predicted cycle: `1` (eaten) -> `3`
+(bobbing in house) -> `4` (confined) -> `2` (exiting) -> `0` (roaming
+again) -- confirmed repeating multiple times across the recording (e.g.
+slot 1 at frames 2240/2324/2435/2493/2665, then again at 5124 onward).
+One nuance the live data added that the static trace alone didn't
+distinguish: an eaten ghost's `GhostFrightFlag` clears back to `0` at
+its own pace as it makes its way home (via the "arrived home" cleanup,
+`rom:sub_D9FE`), not all at once -- which fits `rom:sub_DAF8`'s global
+wrap-driven clear explicitly skipping `GhostState` 1 and 3 (already-
+eaten/mid-transit ghosts), so only *still-roaming* ghosts are affected
+by the global timer. `ChaseModeFlag` was also confirmed to genuinely
+toggle `0`/`1` throughout the recording (first flips to `1` at frame
+1435, matching wave-start, then keeps alternating roughly every
+500-3,000 frames for the rest of the run) -- the scatter/chase handoff
+mechanism is real and active, even though its duration schedule's
+actual values remain unfound.
+
+**The per-ghost movement dispatcher** (`rom:sub_D713`, called once per
+ghost per movement step) picks a behavior in priority order: `GhostState
+!= 0` always wins (head for the house door); then `GhostFrightFlag != 0`
+(pure random wandering, `rom:sub_D72F`); then a single global
+`ChaseModeFlag` (`ram_00FF`, newly named) decides between the real
+targeting AI and an alternate mode.
+
+**The real targeting AI (`rom:sub_D777`, `ChaseModeFlag`==0) replicates
+all four arcade ghost personalities, keyed off the ghost's own slot
+number:**
+
+* Slot 0 ("Blinky", the fallthrough default): targets Pac-Man's current
+  position directly, with an extra check that sets a nonzero speed-boost
+  code as dots run low -- a plausible Cruise Elroy implementation, not
+  yet live-verified as an actual speed change.
+* Slot 1 ("Pinky"): targets a fixed offset ahead of Pac-Man in his
+  current facing direction -- the textbook "ambush" algorithm.
+* Slot 2 ("Inky"): targets *twice* the vector from Blinky's own position
+  to a point ahead of Pac-Man -- the textbook double-vector algorithm,
+  reproduced exactly (including using Blinky's live position as an
+  input, the detail that makes Inky's behavior depend on where Blinky
+  is, not just Pac-Man).
+* Slot 3 ("Sue"/Clyde): measures actual distance from itself to Pac-Man
+  for a distance-gated chase-or-flee decision -- the textbook
+  Clyde/Sue algorithm.
+
+**The alternate mode** (`rom:sub_D74A`, `ChaseModeFlag`!=0) is entered
+once at the start of every wave (`rom:sub_DA32`) and is the shape of
+scatter mode -- but only slots 2 and 3 get an actual fixed corner target
+in this routine; slots 0 and 1 fall through to the same random-walk
+primitive frightened ghosts use. Flagged rather than fully explained:
+either a genuine simplification in this port, or a misattribution of
+which slot maps to which ghost that a live check would clear up.
+
+**Frightened mode starts and ends through two different, asymmetric
+mechanisms.** It starts all at once: `rom:sub_DAC3` (power-pellet-eaten
+handler, called from `rom:L_D1FD`) sets `GhostFrightFlag` to `$08` for
+every eligible ghost in one shot. It ends *implicitly*, with no
+independent countdown at all -- `rom:sub_DAF8`, called every time the
+per-wave movement-cadence counter (`SpeedCountdown`/`WaveSpeedPeriod`,
+the same mechanism the "runs slowly" investigation found) completes a
+full cycle, clears `GhostFrightFlag` back to 0 for every eligible ghost.
+Since `WaveSpeedPeriod` shrinks in later waves, this one piece of
+plumbing produces *both* effects the manual and general Pac-Man
+knowledge would predict independently: movement gets faster **and**
+fright duration gets shorter as the game progresses, from the exact
+same per-wave table (`dat_DCF9`) -- not two separate mechanics, one
+elegant reuse.
+
+**Mode switching (scatter<->chase) is a queued, timed handoff.**
+`rom:sub_D69B` (once per frame) advances an elapsed-time counter once
+per full movement-cadence cycle and, once it reaches a scheduled target
+(`ModeTimerTargetLo`/`Hi`, `ram_216C`/`ram_216D`), calls `rom:sub_DB35`:
+sets `ChaseModeFlag` back to 0 and forces every ghost still roaming
+normally to reverse direction -- the classic arcade tell of a mode
+switch -- then shifts a single queued next-duration
+(`ModeTimerNextLo`/`Hi`, `ram_216E`/`ram_216F`) into the current target.
+**Not found this pass:** where the actual duration *values* get loaded
+into that schedule -- nothing in the ~52% of code traced so far writes
+to `ram_216C`-`ram_216F` except this shift-and-reset logic itself, so
+the real scatter/chase timing numbers are still unknown; they likely
+live in the ~48% of ROM not yet reached as code.
+
+**Ghost-house release has two mechanisms, not one.** The normal path
+(found earlier) is `dat_E8AA`'s per-slot staggered thresholds
+(9/12/15/18). This pass found a second, independent one:
+`GhostReleaseTimeout` (`ram_00F8`) counts up against a `WaveCounter`-
+scaled threshold (240 frames early, 180 later) and, once reached, force-
+releases whichever of slots 1-3 is still confined -- a time-based
+fallback distinct from the staggered threshold, matching the arcade's
+classic dual dot-count/timeout release design (an earlier informal
+guess had mislabeled this same routine as a "fright-mode duration
+timer" before this pass traced it properly -- that guess never made it
+into `annotations.json`, so there's nothing to retract there, but it's
+worth naming as a wrong turn corrected before being written down).
+Whether this port *also* has a dot-count-linked release wasn't found
+this pass.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -491,10 +622,22 @@ position byte at all.
   flagged as a hypothesis, not a finding (see above).
 * Why no `GCC(c)1984`-style signature string turned up in the tail
   block, unlike both sibling 16K/32K projects that checked.
-* Ghost behavior mechanics beyond what the manual states (chase/scatter/
-  frightened timing, if this port implements anything beyond "turns
-  blue when a pellet is eaten") -- entirely unconfirmed against the
-  ROM's own bytes so far.
+* ~~Ghost behavior mechanics beyond what the manual states (chase/
+  scatter/frightened timing, if this port implements anything beyond
+  "turns blue when a pellet is eaten")~~ -- **MOSTLY RESOLVED.** See
+  "Checking the ghost logic" above: all four ghosts' distinct arcade
+  targeting personalities are identified and traced, along with the
+  frightened-mode start/end mechanism, the scatter<->chase mode-switch
+  handoff, and a second ghost-house-release mechanism -- and the core
+  state machine (fright start/end, the eaten-ghost state cycle, the
+  chase/scatter toggle) is now live-verified against `run-02.inp`, not
+  just statically traced. Not found: the actual scatter/chase duration
+  values (the mechanism exists and is confirmed live to actively
+  toggle, but the schedule's numbers don't seem to be written anywhere
+  in the ~52% of code traced so far); the Cruise Elroy speed-boost
+  effect (the code path is identified but not checked against an actual
+  speed change); and whether ghost-house release also has a dot-count-
+  linked trigger alongside the two timer-based mechanisms found.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **PARTIALLY ANSWERED.** The ghost-chain table is now found and mostly
   live-verified (200/400/800/1,600, see above). Dots and power pellets
