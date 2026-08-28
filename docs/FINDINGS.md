@@ -1030,6 +1030,28 @@ exactly the right stride), exactly which game element these four
 silhouettes are, and whether the other two clean runs decode as
 cleanly once actually rendered.
 
+**A follow-up push found more real structure without landing a final
+clean image.** The user raised a specific, testable hypothesis: that
+this might be several bit-planes stacked for a palette-driven animation
+effect (cycling which plane "counts" via a palette change) rather than
+one wide static image. Decomposing the confirmed 240-byte grid by its 4
+constituent bit-pairs (instead of reading all 4 across as one row) as a
+direct test of that turned up two more robust, reproducible facts: bit-
+pair 0 (the top 2 bits of every byte) is exactly 0% set across all 240
+bytes with zero exceptions -- one of the 4 conceptual "planes" is
+entirely unused throughout this run -- and, independently, every 6th
+byte (position 5/11/17/23 within each 24-byte row) is exactly `$00`,
+meaning each row is really four 6-byte sub-groups (5 meaningful bytes +
+1 blank/terminator), matching the "4 ghosts" read exactly as 4 separate
+small graphics rather than one continuous image. Isolating each 5x10
+sub-graphic individually (at the fuller 6-bit range those bytes
+actually use, since the top 2 bits are unused) shows a rounded-top,
+wider-middle, blocky-bottom silhouette consistent with a ghost outline,
+but no clean internal detail (no obvious eyes) emerged at this
+resolution. Whether the always-unused top bit-pair is a genuinely
+unused 4th animation-frame slot, a hardware-reserved bit range, or just
+this sprite not needing the full value range is still open.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
