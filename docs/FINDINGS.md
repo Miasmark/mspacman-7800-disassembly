@@ -1141,6 +1141,46 @@ bytes of a `JMP` as though they were an opcode -- consistent throughout
 with MARIA DMA-ing this region rather than the 6502 ever loading from
 it.
 
+**Follow-up: do the recordings actually read it? (And that DMA inference
+was wrong.)** Read-tapping the three sub-regions across a full recording
+first gave a confusing answer: zero reads after boot for *all three* --
+including the confirmed font, which is definitely used. That negative
+control is what flagged the result as inconclusive rather than
+meaningful. Walking the display list properly (`dlwalk.py` against a
+live RAM dump, during both gameplay and the intermission) then showed
+why: **every MARIA graphics pointer targets RAM** -- `$1B10`/`$1B2C`/
+`$1B48` character maps and `$2200`/`$2202` direct-mode actor sprites --
+and none targets ROM. MARIA never DMAs this block at all.
+
+The block is instead **copied ROM into RAM once at init**, by
+`rom:sub_CF13`, which reads its source through a zero-page pointer with
+`LDA (ram_00B0),Y`. That's an *indirect* load -- structurally invisible
+to the absolute-operand scan above, which is exactly why that scan found
+nothing and why the "must be MARIA DMA" inference drawn from it was
+wrong. `sub_CF13` also reads a second pointer 12 bytes ahead and
+interleaves the two, de-interleaving the ROM's packed glyph format into
+the line-planar layout MARIA's indirect character mode needs. This also
+closes the old `CHARBASE` puzzle: `CHARBASE`=`$22` points into RAM
+because the glyphs are *put* there at init.
+
+**The tail is not dead data.** Two independent lines: the read-tap sees
+~2,980 bytes of the tail read during the boot/init window, and -- not
+relying on timing at all -- `rom:sub_CEAB`, the already-identified
+fruit-tray renderer, explicitly loads pointer **`$C768`** (inside
+`rom:C4E0`-`rom:CA1F`) and hands it to `sub_CF13`. So the tail holds
+multi-colour icon and actor graphics, copied to RAM alongside the
+character set.
+
+**A failed experiment worth recording:** ROM fault injection -- zeroing
+each region and replaying the recording -- is *not* valid here. Patching
+the cartridge desynchronises playback from boot (patched runs showed a
+different score at the same frame number), so fixed-frame screenshot
+diffs are confounded and the percentages they produce are meaningless.
+The one result robust to that confound was structural rather than
+timing-based: zeroing `rom:C000`-`rom:C0BF` removes **every maze wall**
+from the screen while dots, actors, score and text still render --
+independently confirming tiles `$30`-`$45` as the wall pieces.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
