@@ -256,6 +256,51 @@ specific playthrough's starting choice producing a degenerate,
 single-outcome case of a genuinely-random mechanism, not a bug, and not
 a port divergence from the manual after all.
 
+## The maze-change schedule, and a first data block resolved
+
+The user suggested chasing the intermission hint might help classify
+some of the day-one data blocks. It did -- for a different table than
+the intermissions themselves, which are still unfound, but a real,
+concrete result all the same.
+
+`WaveCounter` advancing on every level clear turns out to have a
+companion, `MazeScheduleIndex` (`ram_00A7`), which wraps from 14 back
+down to 6 rather than to 0 -- so after an initial 0-13 run-up, it cycles
+through 6-13 forever. It indexes `dat_D03A` (14 bytes:
+`$FF,$FF,$00,$FF,$FF,$01,$FF,$FF,$FF,$02,$FF,$FF,$FF,$02`): `$FF` means
+"keep the current maze," anything else is a real maze index passed to
+`rom:sub_E0FB` to reload it. Reading the non-`$FF` positions directly:
+**maze changes happen exactly at wave-index 2 and 5 -- Strawberry and
+Apple, matching the user's hint precisely** -- plus two more at 9 and 13
+(both loading maze 2) that weren't mentioned, plausibly because by wave
+9+ `CurrentFruitType` has already left the named sequence and these
+transitions may not carry the same visual weight. After wave 13, the
+repeating 6-13 cycle keeps landing on maze 2 forever -- the maze stops
+changing once the player is far enough in, the same "permanently
+locked" shape as the Banana fruit mechanism above, just for maze layout
+instead of fruit type.
+
+A companion table (`dat_D02C`, feeding `MazeColorVariant`/`ram_00A5`)
+cycles cleanly through all 4 values rather than mostly repeating --
+possibly the actual "four different maze patterns" selector the manual
+describes, not yet confirmed against what it controls on screen.
+
+**A real data block resolved along the way:** tracing `rom:sub_E0FB`
+led to `rom:sub_CD5E`, which copies `dat_CF51` -- one of the day-one
+"mixed-signature" blocks this project couldn't classify further at the
+time -- directly into `$1F00+`, the working display area Maria renders
+from. Confirmed graphics/display-list data, not a jump or parameter
+table. First concrete resolution of one of the nineteen originally-
+unclassified small blocks.
+
+**What's still missing:** the intermission animation itself, as
+distinct from the maze-layout change. `sub_E0FB` (called at the same
+transition points) reads as a general maze-reset/reload routine --
+nothing yet identified inside it as cutscene-specific. The maze-change
+schedule is a strong structural lead (it lines up with the user's hint
+exactly), but it isn't the intermission itself until something more is
+found.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -270,7 +315,10 @@ a port divergence from the manual after all.
 * Whether the large graphics-signature block (`dat_C000`) really is
   character/sprite tile data -- not yet rendered or cross-checked
   against known 7800 graphics-mode bit-plane conventions.
-* What each of the nineteen smaller mixed-signature blocks actually is.
+* ~~What each of the nineteen smaller mixed-signature blocks actually
+  is~~ -- **ONE RESOLVED.** `dat_CF51` is confirmed graphics/display-list
+  data, copied into Maria's working display area at maze-load time (see
+  "The maze-change schedule" above). The other eighteen remain open.
 * Why no `GCC(c)1984`-style signature string turned up in the tail
   block, unlike both sibling 16K/32K projects that checked.
 * Ghost behavior mechanics beyond what the manual states (chase/scatter/
@@ -290,9 +338,15 @@ a port divergence from the manual after all.
   The level-select screen and the Teddy Bear fruit value are confirmed
   live (see above). What specifically makes the game run *slowly* when
   started this way is still open -- not yet investigated.
-* Where the intermission animations live, and whether they really do
-  trigger after the Strawberry and Apple level wins specifically -- the
-  user's second hint, not yet investigated.
+* ~~Where the intermission animations live, and whether they really do
+  trigger after the Strawberry and Apple level wins specifically~~ --
+  **PARTIALLY ANSWERED.** The maze-change schedule (`dat_D03A`) fires at
+  exactly wave-index 2 and 5 -- Strawberry and Apple -- matching the
+  user's hint precisely, a strong structural lead. What's still missing:
+  the intermission animation itself, as distinct from the maze-layout
+  reload; `rom:sub_E0FB` (called at the same transitions) reads as a
+  general reset routine with nothing yet identified as cutscene-specific
+  inside it.
 * ~~Whether the maze/level name sequence genuinely clamps at Banana
   rather than moving to "random fruit" as the manual describes~~ --
   **RESOLVED, and not a manual-vs-ROM divergence at all.** See "The
