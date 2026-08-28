@@ -1219,8 +1219,17 @@ independently confirming tiles `$30`-`$45` as the wall pieces.
   Atari 7800 system BIOS's own boot-time cartridge-checksum routine,
   copied into RAM and run once per session, external to the game
   entirely. See "The orphan blocks, actually resolved" above.
-* Why no `GCC(c)1984`-style signature string turned up in the tail
-  block, unlike both sibling 16K/32K projects that checked.
+* ~~Why no `GCC(c)1984`-style signature string turned up in the tail
+  block, unlike both sibling 16K/32K projects that checked~~ --
+  **RESOLVED, and the day-one claim was wrong.** It *is* there:
+  `GCC(C)1984` in plain ASCII at `rom:FF6C`, inside `dat_FC7C` --
+  General Computer Corporation, the same developer signature the
+  siblings carry. The original check only scanned the block's *leading*
+  bytes and the string sits near its end, so this was a false negative,
+  not a real difference between this ROM and its siblings. Distinct
+  from the on-screen credit `COPYRIGHT ATARI 1984`, which isn't ASCII
+  at all but a tile-code string in `dat_F952` -- which is exactly why a
+  plain ASCII grep turns up one and not the other.
 * ~~Ghost behavior mechanics beyond what the manual states (chase/
   scatter/frightened timing, if this port implements anything beyond
   "turns blue when a pellet is eaten")~~ -- **RESOLVED.** See "Checking
@@ -1286,8 +1295,12 @@ independently confirming tiles `$30`-`$45` as the wall pieces.
   whatever starting level the player picked on the title screen,
   producing a degenerate always-Banana outcome specifically when Banana
   itself was the starting choice -- exactly the case in `run-01.inp`.
-* What `ram_2124` and the large table it indexes (`dat_E342` onward)
-  actually are, now that "level index into maze data" is retracted as
-  the likely explanation.
+* ~~What `ram_2124` and the large table it indexes (`dat_E342` onward)
+  actually are~~ -- **RESOLVED** (this bullet was stale). `dat_E342` and
+  its many sibling 3-entry tables are per-maze-variant parameters for
+  the intermission actors (see "Nailing down the data blocks");
+  `ram_2124` is each actor's own live position coordinate, seeded from
+  the init-position table `dat_DCCD`/`dat_DCD1`, and separately reused
+  by `rom:sub_E0FB` to hold the small intermission/maze variant index.
 * The private reference source stays unconsulted, per the plan -- see
   `README.md`.
