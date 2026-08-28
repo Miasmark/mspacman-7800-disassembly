@@ -16,10 +16,26 @@ one command (below).
 
 [`docs/FINDINGS.md`](docs/FINDINGS.md) is the real deliverable: a narrative
 of what's been confirmed live in MAME, what's still just a hint, and what
-was actively distrusted and flagged rather than assumed. This is day one of
-the project, so read it as a starting map, not a finished one.
-[`annotations.json`](annotations.json) is the machine-readable form of the
-same knowledge.
+was actively distrusted, tested, and in several cases retracted rather
+than assumed. [`annotations.json`](annotations.json) is the
+machine-readable form of the same knowledge.
+
+Every byte of the ROM is classified as code or a declared data block, and
+all 23 data blocks are identified. Solved and live-verified: the full
+ghost AI (all four arcade targeting personalities, frightened mode, the
+scatter/chase timer, two ghost-house release mechanisms), every scoring
+path (dots, power pellets, fruit, ghost chains, the 9,990-point extra
+life), the per-wave speed curve, the fruit and maze progressions, the
+three intermissions, and the complete character set -- font glyphs plus
+maze, pen and title-logo tiles.
+
+The wrong turns are deliberately left in place next to the corrections,
+because several of them were the most instructive part of the work: a
+"live-verified" claim that turned out to be two routines writing the same
+RAM slot, a confident "MARIA must be DMA-ing this" inference undone by an
+indirect load, a "solved completely" that covered less than half the block
+it claimed, and a day-one anomaly that was really a false negative from
+searching only the first few bytes.
 
 A privately-held, unlicensed historical source for this game exists (the
 same archive the sibling projects' reference sources came from), and was
@@ -67,9 +83,10 @@ python3 ../a7800-toolkit/tools/disasm.py "Ms Pac-Man (NTSC) (Atari) (1987) (E42F
 Live findings in this project come from replaying a MAME input
 recording (a deterministic button-press log, not video, and not
 copyrighted content) against a PC/frame-tagged Lua probe -- the same
-technique the sibling projects used throughout. `.inp` files aren't
-committed until at least one exists; add them to `.gitignore`'s
-exceptions if that changes.
+technique the sibling projects used throughout. Four recordings
+(`run-01.inp` through `run-04.inp`) are committed here, and most live
+findings cite specific frames in one of them -- they're what makes the
+claims in `docs/FINDINGS.md` reproducible rather than assertions.
 
 ```
 ./"Record Session.command"        # play, Esc to stop -> next free run-NN.inp
