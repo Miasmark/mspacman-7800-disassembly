@@ -918,6 +918,38 @@ table, each spaced 24 pixels apart. **Live-verified**: a screenshot at
 frame 2,200 (wave 0) shows an empty tray; a screenshot at frame 21,500
 (wave 5) shows exactly 5 fruit icons, matching the formula precisely.
 
+## Pushing on dat_C000: narrowed, not confirmed
+
+Tried to settle the last big open item -- whether the large graphics-
+signature block (`dat_C000`, 2,592 bytes) really is character/sprite
+tile data -- using the toolkit's `dlwalk.py` against a live dump of
+Maria's actual working display list (`ram_1F00`+, captured mid-game).
+
+The maze wall row decodes as a real, legible display-list entry:
+indirect character mode, 28 characters wide (matching the maze's known
+row width), with its "graphics" pointer at `$1B10` -- which turned out
+to be the *tile-code* buffer `rom:sub_F5E9`/`rom:sub_F5FF` already read
+and write (the already-fully-solved autotile system), not raw pixel
+data. That rules `dat_C000` out as the direct source for the maze
+walls specifically.
+
+For indirect character mode, the actual bitmap for each tile code
+comes from `CHARBASE` (per the toolkit's own hardware docs: address =
+`((CHARBASE + line) << 8) | character_number`). `CHARBASE` is written
+exactly once anywhere in this ROM (`rom:CBE1`, to `$22`), which points
+into RAM (`$2200`-`$29xx` across the character's scanlines) -- not
+`$C000`. So under the one `CHARBASE` setting this game ever uses, its
+indirect-mode character bitmaps aren't fetched directly from
+`dat_C000` either. No bulk copy loop targeting that `$2200`-`$29FF`
+range turned up to suggest a ROM-to-RAM relocation the way `dat_CF51`
+and the maze bitmap both use.
+
+Net result: narrowed, not confirmed. `dat_C000` is not the maze walls
+and doesn't appear to be reached via the game's one `CHARBASE` setting
+either -- still an open graphics-signature guess, just with two more
+specific identities ruled out by live tracing rather than left
+untested.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -927,10 +959,13 @@ frame 2,200 (wave 0) shows an empty tray; a screenshot at frame 21,500
   maze wall layout lives in the `dat_FC7C` tail block as a compact
   bitmap, decoded via `dat_FBBC`/`dat_FBDC`.
 * Whether the large graphics-signature block (`dat_C000`) really is
-  character/sprite tile data -- not yet rendered or cross-checked
-  against known 7800 graphics-mode bit-plane conventions. Two other
-  candidate identities (maze bitmap, maze color/attribute data) were
-  ruled out this pass, narrowing but not yet confirming it.
+  character/sprite tile data -- pushed on directly with a live Maria
+  display-list trace (see "Pushing on dat_C000" above): ruled out as
+  the maze walls specifically, and doesn't appear reachable via the
+  game's one `CHARBASE` setting either. Still not confirmed what it
+  actually is -- narrowed by elimination three times over now (maze
+  bitmap, maze color data, and the maze walls' own graphics), not by
+  a positive identification.
 * ~~What each of the nineteen smaller mixed-signature blocks actually
   is~~ -- **RESOLVED.** 14 of the 19 traced to a real, callsite-
   confirmed identity in the data-blocks pass (see the table above), on
