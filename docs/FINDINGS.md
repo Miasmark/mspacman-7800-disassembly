@@ -450,16 +450,34 @@ position byte at all.
 | `dat_E8AA` | Per-ghost-slot staggered ghost-house release-delay thresholds (9/12/15/18) -- a first concrete hint at ghost-release timing. |
 | `dat_DC6B`/`dat_DC70` | Already known from the speed investigation -- the movement-cadence checkpoint tables `sub_DC44` uses. |
 
-**Left genuinely open, honestly:**
+**Both of the two "left genuinely open" blocks from this pass got
+resolved in a later pass** (pushed on directly rather than left as a
+permanent hedge):
 
-* `dat_E970` -- fills a 32-byte RAM buffer pair, contains embedded ROM-
-  address-shaped byte pairs mixed with small integers; plausibly a HUD/
-  attract-text row template, not decoded further.
-* `dat_DE73` -- a 4x4 matrix with a distinctive -1-diagonal/+1-band
-  shape, read inside actor-targeting math; plausible ghost-AI turn-bias
-  table, not traced to a specific decision.
-* Four tiny blocks (`dat_F83C`, `dat_E9BD`, `dat_E9D4`, `dat_D49B`) have
-  **zero static callers anywhere** in the traced code, yet each decodes
+* `dat_E970` -- confirmed as part of a text-rendering subsystem.
+  `ram_1800`/`ram_1A00` (its copy destinations) turned out to be generic
+  1KB scratch RAM zero-cleared at boot and reused by multiple unrelated
+  systems, not a dedicated array. The neighboring routine
+  (`rom:sub_E94A`) confirmed the family: it reads a sibling table
+  (`dat_FA1B`) byte-by-byte, subtracts a fixed offset to convert each
+  into a small tile-code, and substitutes the same "blank" filler value
+  for a zero/delimiter byte -- the shape of an encoded-message-to-tile-
+  code string renderer (likely game-over/HUD text, given the
+  neighboring code also touches `FruitTypeFloor` and branches on player
+  number). The exact message content wasn't decoded.
+* `dat_DE73` -- fully resolved as the ghost intersection turn-decision
+  cost table. `rom:sub_DE2E` computes a preferred axis (horizontal or
+  vertical, whichever has the bigger remaining distance to the target)
+  as a direction code; `rom:L_DE15` then adds that code to each
+  candidate exit direction at a junction and indexes this table for a
+  small cost adjustment -- directions matching the preferred axis/sign
+  score lowest (the table's `-1` diagonal). This is the concrete
+  mechanism behind the classic Pac-Man ghost pathfinding rule ("lean
+  toward the target on whichever axis is further off"), not just a
+  vague "turn-bias" guess.
+
+Four tiny blocks (`dat_F83C`, `dat_E9BD`, `dat_E9D4`, `dat_D49B`) still
+have **zero static callers anywhere** in the traced code, yet each decodes
   cleanly as a small, coherent 6502 routine (a graphics-pointer reader,
   a generic page-copy loop, an index-times-4 helper, and a bare `JMP`
   respectively). No indirect-jump instruction (`JMP (...)`/`JSR (...)`)
