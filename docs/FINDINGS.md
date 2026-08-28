@@ -1052,6 +1052,64 @@ resolution. Whether the always-unused top bit-pair is a genuinely
 unused 4th animation-frame slot, a hardware-reserved bit range, or just
 this sprite not needing the full value range is still open.
 
+## dat_C000 fully solved: it's the font, found by reading the intermission code
+
+Every previous round on `dat_C000` guessed at pixel formats -- bit depths,
+row widths, orientations, plane layouts -- and got closer without ever
+landing it. The user cut that off with the right instruction: *"you will
+need to see how the intermission code interprets and uses the images."*
+That was exactly right, and it solved the block outright in one pass.
+
+`rom:sub_E168` (the intermission setup, already known from the
+live-verified cutscene work) calls `rom:sub_F890` twice before spawning
+its actors. Reading `sub_F890` properly, it isn't a sprite-graphics
+routine at all -- it writes a horizontal run of **tile codes** into the
+same shared tile buffer the maze autotiler uses (`rom:sub_F5E9`),
+driven by four parallel tables: start offset, length, screen row,
+screen column. Its two source tables decode as plain English:
+
+| | |
+|---|---|
+| `dat_F952` | `BLINKY` `PINKY` `INKY` `SUE` `MS PAC-MAN` `COPYRIGHT ATARI 1984` `WITH` `STARRING` `USE JOYSTICK TO` `CHANGE SETTINGS` `PLAYER ONE` `PLAYER TWO` `ONE PLAYER` `TWO PLAYER` + a 5-row title-logo tile grid |
+| `dat_FA1B` | `TEDDY BEAR` `CHERRIES` `STRAWBERRY` `ORANGE` `PRETZEL` `APPLE` `PEAR` `BANANA` `ACT 1` `ACT 2` `ACT 3` `THEY MEET` `THE CHASE` `JUNIOR` `READY!` `GAME OVER` |
+
+The eight fruit names appear in exactly the order of the fruit
+point-value table found on day one. And the intermission calls resolve
+precisely: variant 0 -> **"ACT 1" / "THEY MEET"**, variant 1 -> **"ACT 2"
+/ "THE CHASE"**, variant 2 -> **"ACT 3" / "JUNIOR"** -- the arcade
+Ms. Pac-Man intermission titles, read straight out of this ROM's bytes,
+independently confirming the three-intermission structure that was
+live-verified earlier from the other direction.
+
+**The tile map, and where `dat_C000` fits.** The strings gave the
+encoding directly: `$50`=space, `$51`=dot, `$52`/`$53`=power pellet,
+`$54`-`$5D`=`0`-`9`, `$5E`-`$77`=`A`-`Z`, `$78`=`!`, `$7A`=`-`, and
+`$7B`+ = maze wall pieces and title-logo tiles. Note `$51`/`$52`/`$53`:
+those are *exactly* the dot and power-pellet codes the dot-eating
+detector checks for, and `$50` is the blank it overwrites them with --
+an independent cross-confirmation from a completely different
+investigation.
+
+Each tile's bitmap lives at **`rom:C0C0` + (tile - `$50`) x 6** -- five
+bytes of 4-pixel-wide 2bpp data plus one pad byte. Rendered as a sheet,
+that produces a fully legible font: digits, the complete alphabet,
+punctuation, then the grey maze-wall autotile pieces. Rendering the
+title-screen tile grid reproduces the **"MS PAC-MAN" logo**.
+
+**This explains every earlier dead end at once.** The block is a
+sequence of 6-byte glyph cells, so *any* arbitrary row width slices
+across glyph boundaries -- at 24 bytes/row you see exactly four glyphs
+per row, which is precisely the "4 ghosts" that were actually four
+letters. Only 2 of 4 palette values ever appear because the font is
+monochrome. The "every 6th byte is `$00`" discovery was the glyph cell's
+own pad byte. Even the earlier `CHARBASE` puzzle fits: the game copies
+this tile set into RAM and points `CHARBASE` there, which is why the
+register never points at `$C000` directly.
+
+Still open, and much smaller now: the 192 bytes at `rom:C000`-`rom:C0BF`,
+before the `$50` tile sequence begins, are not part of the character set
+and remain uncharacterised.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -1061,7 +1119,13 @@ this sprite not needing the full value range is still open.
   maze wall layout lives in the `dat_FC7C` tail block as a compact
   bitmap, decoded via `dat_FBBC`/`dat_FBDC`.
 * ~~Whether the large graphics-signature block (`dat_C000`) really is
-  character/sprite tile data~~ -- **CONFIRMED, partially.** See
+  character/sprite tile data~~ -- **FULLY RESOLVED.** It is the game's
+  character set: font glyphs (`0`-`9`, `A`-`Z`, punctuation) plus the
+  maze wall and title-logo tiles, at `rom:C0C0` + (tile-`$50`)x6, six
+  bytes per glyph. Found by tracing the intermission's text renderer
+  rather than guessing pixel formats -- see "dat_C000 fully solved"
+  above. Only the 192 bytes before `rom:C0C0` remain uncharacterised.
+  *(Superseded earlier note:)* **CONFIRMED, partially.** See
   "dat_C000, actually confirmed as graphics" above: a 242-byte run
   (`rom:C0D2`-`rom:C1C4`) is structurally proven to be genuine 2-color
   graphics data (every byte's 2-bit pairs are binary `00`/`11`, never
