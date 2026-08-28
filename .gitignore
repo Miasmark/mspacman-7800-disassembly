@@ -25,6 +25,7 @@
 /fruitcheck/
 /fruitcheck2/
 /fruitframe/
+/cutscenecheck/
 
 # Raw memory dumps -- contain copyrighted ROM/RAM bytes, reproducible from
 # a recording + a probe script (see docs/FINDINGS.md for which probe made

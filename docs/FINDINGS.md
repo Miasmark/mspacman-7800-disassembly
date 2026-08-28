@@ -293,13 +293,33 @@ from. Confirmed graphics/display-list data, not a jump or parameter
 table. First concrete resolution of one of the nineteen originally-
 unclassified small blocks.
 
-**What's still missing:** the intermission animation itself, as
-distinct from the maze-layout change. `sub_E0FB` (called at the same
-transition points) reads as a general maze-reset/reload routine --
-nothing yet identified inside it as cutscene-specific. The maze-change
-schedule is a strong structural lead (it lines up with the user's hint
-exactly), but it isn't the intermission itself until something more is
-found.
+**Update: the intermission animation itself, found.** It was sitting in
+`rom:sub_E0FB` the whole time -- easy to walk past on a first read
+because the same routine also handles the mundane "clear old sprites,
+set the new maze index" housekeeping. Past that setup, it stores three
+special actor sprites (`rom:sub_E168`, reading `dat_E348`/`dat_E34B`/
+`dat_E354`/`dat_E35D` for slots 0/1/2) and then **blocks in a wait
+loop** -- `JSR sub_CB25` (the general per-frame update) called
+repeatedly until `ActorActiveFlags` (`ram_1D00`, newly named -- the same
+per-actor "is this slot alive" array `rom:sub_EA36` also reads) reaches
+zero. Only once that happens does `sub_E0FB` return and the normal
+"load the next maze" sequence proceed.
+
+**Live-verified, not just read off the code.** Screenshotted the actual
+animation in `run-02.inp` at the Strawberry level win (frames
+13,400-13,540, wave-index 2->3): a Pac-Man-like character and a
+Ms. Pac-Man-like character with a ghost, moving across an otherwise
+black screen with no maze walls -- the classic Ms. Pac-Man "hallway"
+intermission. `ActorActiveFlags` reads `1` throughout that exact window
+and drops to `0` at frame 13,510, right before the next screenshot shows
+the new maze rendering in.
+
+The other two milestone waves (9 and 13, both loading maze 2) run
+through the identical code path and should trigger the same animation,
+though the user only reported the Strawberry/Apple ones -- plausibly
+because by wave 9+ the named fruit sequence has already ended (see "The
+Banana lock" above) and those transitions are less memorable, not
+because the mechanism differs.
 
 ## What's still open
 
@@ -340,13 +360,11 @@ found.
   started this way is still open -- not yet investigated.
 * ~~Where the intermission animations live, and whether they really do
   trigger after the Strawberry and Apple level wins specifically~~ --
-  **PARTIALLY ANSWERED.** The maze-change schedule (`dat_D03A`) fires at
-  exactly wave-index 2 and 5 -- Strawberry and Apple -- matching the
-  user's hint precisely, a strong structural lead. What's still missing:
-  the intermission animation itself, as distinct from the maze-layout
-  reload; `rom:sub_E0FB` (called at the same transitions) reads as a
-  general reset routine with nothing yet identified as cutscene-specific
-  inside it.
+  **RESOLVED.** `rom:sub_E0FB` sets up three special actor sprites and
+  blocks in a wait loop until they finish, called exactly at the
+  wave-index 2/5/9/13 maze-change points (`dat_D03A`) -- live-verified
+  with a screenshot of the actual animation and `ActorActiveFlags`
+  (`ram_1D00`) tracking it frame-for-frame in `run-02.inp`.
 * ~~Whether the maze/level name sequence genuinely clamps at Banana
   rather than moving to "random fruit" as the manual describes~~ --
   **RESOLVED, and not a manual-vs-ROM divergence at all.** See "The
