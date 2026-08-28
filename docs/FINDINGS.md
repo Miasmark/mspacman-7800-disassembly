@@ -753,10 +753,20 @@ for jingle/pause timing rather than being the lives counter itself.
   `dat_DF21`), and two independent ghost-house-release mechanisms --
   all live-verified against `run-02.inp`, not just statically traced.
   The Cruise Elroy speed-boost thresholds are also now found (keyed by
-  `MazeColorVariant`, see "Mode switching" above), though the actual
-  speed change itself still isn't confirmed live; and whether ghost-
-  house release also has a dot-count-linked trigger alongside the two
-  timer-based mechanisms found remains open.
+  `MazeColorVariant`, see "Mode switching" above) and its mechanism
+  fully traced: the speed code (`ram_2144,X`) is a Y-index into the
+  same `ram_2150`+ block used for wall color and the mode-timer,
+  sampling one bit per tick to gate whether the ghost's movement
+  decision runs at all -- a duty-cycle throttle, not a distinct code
+  path (see `rom:DEF7`'s comment). Live-confirmed the code itself
+  activates in real play (`ram_2144` for Blinky flips `0`->`1` mid-wave
+  in `run-02.inp`, correlated with dots eaten), though the exact
+  resulting on-screen speed difference wasn't separately measured, and
+  the specific code value seen didn't match this pass's own hand-read
+  of the threshold branches -- a small discrepancy left open rather
+  than forced to agree. Whether ghost-house release also has a
+  dot-count-linked trigger alongside the two timer-based mechanisms
+  found remains open.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **RESOLVED.** The ghost-chain table (200/400/800/1,600) and the fruit
   table were found first and live-verified. Dots (10 points) and power
