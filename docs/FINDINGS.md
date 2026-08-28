@@ -588,26 +588,53 @@ grows), the effective trigger becomes "next time `ram_00FC`'s repeating
 climb crosses its own threshold".
 
 **UPDATE: the schedule's actual values, found and live-verified.**
-`dat_DF21`'s per-maze-color-variant 32-byte blocks are dual-purpose --
-their last 4 bytes double as the mode-timer's initial schedule seed,
-copied into `ram_216C`-`ram_216F` by the exact same `rom:sub_DE8B` copy
-that installs the wall-color/attribute data (see "Nailing down the data
-blocks" above). Confirmed with a second probe
-(`tools/probe-modeschedule2.lua`) against `run-02.inp`: for
-`MazeColorVariant` 0, the seed is exactly `$07,$A4,$19,$54`, landing in
-`ram_216C`-`ram_216F` at the observed wave-start frame (1435) --
-matching the byte values hand-decoded from `dat_DF21` exactly. The
-first two scheduled switches (at frames 4717 and 6651) consume that
-seed pair, after which `rom:sub_DB35`'s own code resets `ModeTimerNext`
-to the `$FF` sentinel -- but live data shows it getting **refilled**
-anyway, alternating between `$01,$A4` and `$06,$54` at every subsequent
-switch for the rest of the recording (16+ switches total, well past
-what a 2-entry queue should allow). **Not found:** the refill's write
-site. No instruction anywhere in the ~52% of code traced so far writes
-anything but `$FF` into `ram_216E`/`ram_216F`, so whatever refills it
-with real values lives in the ~48% not yet reached as code -- a
-concrete, addressable lead (the exact bytes and timing are now known)
-for whoever picks this up next.
+`dat_DF21`'s 32-byte sub-blocks (one per wave, selected by `WaveCounter`
+via a `dat_DFE4` remap -- **corrected here in place**: an earlier
+version of this note said the block was also selected by
+`MazeColorVariant`, which is wrong; closer reading of `rom:sub_DE8B`'s
+tail shows `MazeColorVariant` is used *after* this copy for a
+completely separate lookup, see below) are dual-purpose -- their last 4
+bytes double as the mode-timer's initial schedule seed, copied into
+`ram_216C`-`ram_216F` by the exact same `rom:sub_DE8B` copy that
+installs the wall-color/attribute data (see "Nailing down the data
+blocks" above). Confirmed with a probe (`tools/probe-modeschedule2.lua`)
+against `run-02.inp`: for wave 0, the seed is exactly `$07,$A4,$19,$54`,
+landing in `ram_216C`-`ram_216F` at the observed wave-start frame (1435)
+-- matching the byte values hand-decoded from `dat_DF21` exactly.
+
+**UPDATE 2: the apparent "refill" mystery, resolved -- it isn't a
+refill at all.** The first two scheduled switches (at frames 4717 and
+6651) consume that seed pair, after which `rom:sub_DB35`'s own code
+resets `ModeTimerNext` to the `$FF` sentinel -- but live data showed it
+getting new real values anyway, alternating between `$01,$A4` and
+`$06,$54`. A prior pass flagged this as an unexplained gap ("no write
+site exists in the traced code"), which was wrong -- it just hadn't
+traced far enough. `rom:sub_DE8B` isn't game-start-only: it also runs
+at *every* wave transition, reached through a second call path
+(`rom:L_F6DA`/`rom:sub_CC73`, off the maze-clear sequence around
+`rom:F6C6`) distinct from the game-start path found earlier. Each time
+it runs, it re-seeds the *entire* mode-timer schedule fresh from that
+wave's own `dat_DF21` sub-block -- not a partial refill of just
+`ram_216E`/`ram_216F`. Live-confirmed with a third probe
+(`tools/probe-schedulereseed.lua`): `WaveCounter` visibly advances
+`0`->`1` at frame 6633, and `ram_216C`-`ram_216F` load wave 1's
+`dat_DF21` tail (`$01,$A4,$06,$54`) at frame 6651 -- the very next
+switch. Waves 1 and 2 happen to share an identical `dat_DF21` tail,
+which is why the same pair of values kept reappearing and looked like a
+2-value alternation rather than what it actually is: a fresh reseed
+every wave.
+
+**A genuine bonus find along the way:** `rom:sub_DE8B`'s tail, past the
+main copy, does a *second*, independent lookup keyed by
+`MazeColorVariant` (not `WaveCounter`): `dat_DFD1` -> `dat_DFC1`/
+`dat_DFC2` -> `CruiseElroyThreshold1`/`CruiseElroyThreshold2`
+(`ram_00F9`/`ram_00FA`, newly named) -- the exact two thresholds
+`rom:sub_D777`'s Blinky/Cruise-Elroy check compares against (see
+"Checking the ghost logic" above). This resolves where those thresholds
+come from, left open in that earlier section: they're keyed by maze
+color variant, not wave number directly. The actual speed-boost effect
+itself is still not confirmed live against a real movement-speed
+change.
 
 **Ghost-house release has two mechanisms, not one.** The normal path
 (found earlier) is `dat_E8AA`'s per-slot staggered thresholds
@@ -687,23 +714,18 @@ happened with the ghost-chain table earlier in this project.
   block, unlike both sibling 16K/32K projects that checked.
 * ~~Ghost behavior mechanics beyond what the manual states (chase/
   scatter/frightened timing, if this port implements anything beyond
-  "turns blue when a pellet is eaten")~~ -- **MOSTLY RESOLVED.** See
-  "Checking the ghost logic" above: all four ghosts' distinct arcade
-  targeting personalities are identified and traced, along with the
-  frightened-mode start/end mechanism, the scatter<->chase mode-switch
-  handoff, and a second ghost-house-release mechanism -- and the core
-  state machine (fright start/end, the eaten-ghost state cycle, the
-  chase/scatter toggle) is now live-verified against `run-02.inp`, not
-  just statically traced. The scatter/chase duration schedule's *initial*
-  values are now found too (seeded from `dat_DF21`'s tail bytes -- see
-  "Mode switching" above), though what refills the schedule after the
-  first two switches is still an open, now precisely-scoped lead (known
-  exact byte values and timing, just not the write site, which must be
-  in the ~48% of code not yet reached). Also still open: the Cruise
-  Elroy speed-boost effect (the code path is identified but not checked
-  against an actual speed change); and whether ghost-house release also
-  has a dot-count-linked trigger alongside the two timer-based
-  mechanisms found.
+  "turns blue when a pellet is eaten")~~ -- **RESOLVED.** See "Checking
+  the ghost logic" above: all four ghosts' distinct arcade targeting
+  personalities are identified and traced, along with the frightened-
+  mode start/end mechanism, the scatter<->chase mode-switch handoff
+  (including its full duration schedule, seeded fresh every wave from
+  `dat_DF21`), and two independent ghost-house-release mechanisms --
+  all live-verified against `run-02.inp`, not just statically traced.
+  The Cruise Elroy speed-boost thresholds are also now found (keyed by
+  `MazeColorVariant`, see "Mode switching" above), though the actual
+  speed change itself still isn't confirmed live; and whether ghost-
+  house release also has a dot-count-linked trigger alongside the two
+  timer-based mechanisms found remains open.
 * ~~Actual point values for dots, power pellets, and ghosts~~ --
   **RESOLVED.** The ghost-chain table (200/400/800/1,600) and the fruit
   table were found first and live-verified. Dots (10 points) and power
