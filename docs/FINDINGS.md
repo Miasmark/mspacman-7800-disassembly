@@ -107,6 +107,52 @@ by byte count, and not yet confirmed that the small-integer blocks
 specifically *are* maze data rather than something else with a similar
 byte-frequency signature.
 
+## Four recordings, and concrete hints from the user
+
+Four recordings are in the repo, made across a few sessions as the user
+found more worth capturing. True lengths confirmed up front this time,
+per the lesson the Galaga project paid for at real cost (never trust an
+early exit threshold as "the recording's length" -- let playback exhaust
+naturally against a generous cap and read MAME's own summary line only
+once that's actually happened):
+
+| recording | true length | ~real time |
+|---|---|---|
+| `run-01.inp` | 25,826 frames | ~7.2 min |
+| `run-02.inp` | 22,383 frames | ~6.2 min |
+| `run-03.inp` | 9,902 frames | ~2.75 min |
+| `run-04.inp` | 6,069 frames | ~1.7 min |
+
+Recorded here as concrete, falsifiable targets for the first live probes,
+the same role gameplay hints played in every sibling project so far:
+
+* **There's a level-select feature -- a "Teddy Bear" starting level runs
+  slowly.** The user could begin a session directly from the Teddy Bear
+  maze (the first name in both the fruit-scoring and maze-naming
+  sequences per the manual) rather than always starting from the default
+  first level, and reports the game runs *slowly* when started this way.
+  A concrete, checkable claim: find whatever selects a starting
+  level/difficulty, and find what specifically slows the game down in
+  that state -- a deliberate "practice/slow" mode, a side effect of
+  however level-select is implemented, or something else.
+* **Intermission animations exist, tied to specific level wins.** The
+  user reports a couple of intermission (cutscene) animations, appearing
+  after winning the Strawberry and Apple levels specifically. Classic
+  Ms. Pac-Man's arcade cutscenes trigger after levels 2, 5, and 9 --
+  worth checking directly against this port's own level-naming sequence
+  (Teddy Bear/Cherries/Strawberry/Orange/Pretzel/Apple/Pear/Banana, i.e.
+  Strawberry is the 3rd named level and Apple the 6th) rather than
+  assuming the arcade's own numbering carries over unchanged.
+* **The maze/level name sequence plateaus at Banana, not the manual's
+  "random fruit."** The manual says the maze-naming sequence moves to
+  "random fruit mazes" once Banana is exhausted; the user instead
+  reports the display *stayed* on Banana after clearing that level. A
+  concrete, checkable claim: find whatever advances the level-name/maze
+  index, and see whether it genuinely caps out (clamped, not wrapping or
+  randomizing) rather than assuming the manual's own description holds
+  for this port -- the exact kind of manual-vs-ROM divergence the
+  Galaga project ran into more than once.
+
 ## What's still open
 
 * Whether the two small-integer-signature blocks (`dat_E342`,
@@ -125,5 +171,14 @@ byte-frequency signature.
 * Actual point values for dots, power pellets, and ghosts -- the manual
   gives the fruit table only.
 * Extra-life threshold, if one exists in this port.
+* The Teddy Bear level-select starting point, and what specifically
+  slows the game down when starting from it -- the user's first hint,
+  not yet investigated.
+* Where the intermission animations live, and whether they really do
+  trigger after the Strawberry and Apple level wins specifically -- the
+  user's second hint, not yet investigated.
+* Whether the maze/level name sequence genuinely clamps at Banana rather
+  than moving to "random fruit" as the manual describes -- the user's
+  third hint, not yet investigated.
 * The private reference source stays unconsulted, per the plan -- see
   `README.md`.
