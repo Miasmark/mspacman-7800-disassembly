@@ -466,6 +466,11 @@ position byte at all.
   exists anywhere in the code traced so far that could explain reaching
   any of them dynamically -- so each is flagged, not asserted, as either
   genuinely unreached/dead code or a coincidental decode of real data.
+  **UPDATE, much later in this document ("The orphan blocks, actually
+  resolved"): live read-tapping settled it. Nothing in the cartridge
+  ever reaches them -- that part of this note holds up -- but the
+  Atari 7800 BIOS's own boot-time checksum routine reads all four,
+  every session, entirely external to the game.**
 * `dat_C000` -- still just a byte-frequency guess (graphics/tile sheet),
   though two other candidate identities (maze bitmap, maze color data)
   are now ruled out by this pass, narrowing what it's left to be.
@@ -777,6 +782,51 @@ this ROM. The four blocks remain flagged as unresolved rather than
 resolved-by-elimination -- a real absence of evidence, not proof there
 isn't some other mechanism this search didn't think to check for.
 
+## The orphan blocks, actually resolved: it's the BIOS, not the game
+
+The user's next question cut straight through all of the above: forget
+searching for a caller in the ROM's static structure -- do any of the
+recordings actually *reach or read* these bytes at all? That's a
+directly answerable, empirical question, and a technique this project
+hadn't used before answered it: `mem:install_read_tap` on each block's
+exact byte range, run live against all 4 recordings, watching for any
+touch at all rather than searching for a textual caller.
+
+**Yes -- every recording reads all four blocks**, identically
+(down to the exact hit count) regardless of the recording's length,
+early in each run (roughly frame 14-160). That immediately rules out
+"unreached dead code" as the explanation. What it actually is took one
+more step to pin down. The read-tap's own reported PC was a constant,
+suspicious-looking value (`$2404`, a RAM address) for every single hit
+across all four blocks -- not a tap-timing artifact, it turned out:
+peeking the stack at the moment of each read (the return address left
+by whatever `JSR` got here) traced it to a real, live piece of 6502
+code sitting *in RAM* at `$23FF`, called from a small dispatcher also
+in RAM (`$238F`, `$23B7`, ...). That RAM code is self-modifying -- one
+operand byte (which 256-byte ROM *page* to sweep) gets patched before
+each call, observed live patched to `$E9`, `$F8`, and `$D4` across
+different invocations -- sweeping an entire page byte-by-byte into an
+accumulator and a lookup table. The shape of a checksum or integrity
+pass, not meaningful execution of any one block's bytes as
+instructions.
+
+Tracing the RAM template itself back to its ROM source settled it
+completely: its bytes match a fixed offset (1279) inside the actual
+Atari 7800 **system BIOS** ROM file (`7800ntsc.u7` / `7800 BIOS (U).rom`
+in the sibling `bios/` directory), confirmed by direct byte comparison,
+not present anywhere in Ms. Pac-Man's own cartridge ROM. This is
+BIOS-level cartridge-checksum code, copied into RAM and run once at
+boot, sweeping several ROM pages (including the pages these four
+blocks happen to sit on) -- entirely external to the game's own logic.
+
+So the original "no caller found anywhere in this ROM" conclusion was
+right about what it claimed (no in-cartridge caller exists -- confirmed
+again here, since the JSR sites are in RAM, not ROM) and stays true;
+it just wasn't the complete answer to whether the bytes get touched at
+all. They do, every time, just never by the game. Not pursued further:
+exactly what the BIOS's checksum is protecting or verifying, since
+that's BIOS behavior and out of scope for a cartridge disassembly.
+
 ## What's still open
 
 * ~~Whether the two small-integer-signature blocks (`dat_E342`,
@@ -791,11 +841,15 @@ isn't some other mechanism this search didn't think to check for.
   candidate identities (maze bitmap, maze color/attribute data) were
   ruled out this pass, narrowing but not yet confirming it.
 * ~~What each of the nineteen smaller mixed-signature blocks actually
-  is~~ -- **MOSTLY RESOLVED.** 14 of the 19 traced to a real, callsite-
-  confirmed identity this pass (see the table above), on top of
-  `dat_CF51` resolved earlier. 4 tiny blocks remain genuinely open --
-  no static caller exists anywhere, so their code-shaped byte content is
-  flagged as a hypothesis, not a finding (see above).
+  is~~ -- **RESOLVED.** 14 of the 19 traced to a real, callsite-
+  confirmed identity in the data-blocks pass (see the table above), on
+  top of `dat_CF51` resolved earlier. The remaining 4 (`dat_F83C`,
+  `dat_E9BD`, `dat_E9D4`, `dat_D49B`) have no caller anywhere in this
+  cartridge's own code -- confirmed twice, by two different techniques
+  -- but live read-tapping settled what actually touches them: the
+  Atari 7800 system BIOS's own boot-time cartridge-checksum routine,
+  copied into RAM and run once per session, external to the game
+  entirely. See "The orphan blocks, actually resolved" above.
 * Why no `GCC(c)1984`-style signature string turned up in the tail
   block, unlike both sibling 16K/32K projects that checked.
 * ~~Ghost behavior mechanics beyond what the manual states (chase/
